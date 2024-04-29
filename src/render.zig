@@ -27,6 +27,7 @@ var render_bindgroup: *gpu.BindGroup = undefined;
 var render_bindgroup_layout: *gpu.BindGroupLayout = undefined;
 
 // TODO: This function should actually return an error rather than panicking
+// TODO: create seperate functions that only loads and destroy shaders (hotreloading)
 pub fn init() !void {
     const bindgroups = create_bindgroups() catch unreachable;
     const camera_bindgroup_layout = bindgroups;

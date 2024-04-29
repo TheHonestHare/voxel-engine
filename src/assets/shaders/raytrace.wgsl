@@ -32,11 +32,9 @@ fn raytrace(coords: vec2<f32>, res: vec2<f32>) -> vec4<f32> {
     uv.y = -uv.y; // coordinates of texture start at top left, going down is +y but thats confusing for me
 
     let ro = camera.position;
-    // check if you supposed to add or sub
+    // TODO: This MIGHT not have to be normalized
     let rd = normalize(camera.lookat + (camera.plane_X * uv.x + camera.plane_Y * uv.y));
 
-    var w: vec3<f32> = ro;
-    var t: f32 = 0.;
     var yes = dda(ro, rd);
     col = yes.col;
 
@@ -72,10 +70,21 @@ fn dda(origin: vec3<f32>, dir: vec3<f32>) -> OutDDA {
             ray_len.z += step_len.z;
             t = ray_len.z - step_len.z;
         }
-        if(get_voxel(curr_vox) == 1) { return OutDDA(t, vec3<f32>(1.0)); }
+        let curr = get_voxel(curr_vox);
+        if(curr > 0) { return OutDDA(t, colours[curr - 1]); }
     }
     return OutDDA(t, vec3<f32>(0.0));
 }
+
+const colours = array<vec3<f32>, 7>(
+    vec3<f32>(1.0,0.0,0.0),
+    vec3<f32>(1.0,0.5,0.0),
+    vec3<f32>(1.0,1.0,0.0),
+    vec3<f32>(0.0,1.0,0.0),
+    vec3<f32>(0.0,0.2,0.8),
+    vec3<f32>(0.2,0.0,0.8),
+    vec3<f32>(0.5,0.0,0.5),
+);
 
 fn get_voxel(pos: vec3<i32>) -> i32 {
     // smiley :)
@@ -88,8 +97,8 @@ fn get_voxel(pos: vec3<i32>) -> i32 {
     // if(all(pos == vec3<i32>(0,-3, 0))) { return 1; }
     // if(all(pos == vec3<i32>(0,-2,-1))) { return 1; }
 
-    if(pos.x == 1 && pos.y == 1) {return 1;}
-    return 0;
+    if(pos.y > i32(sin(f32(pos.z) / 10) * 10 + sin(f32(pos.x) / 10) * 10)) {return 0;}
+    return abs(pos.x) % 7 + 1;
 }
 
 fn rot2d(ang: f32) -> mat2x2<f32> {

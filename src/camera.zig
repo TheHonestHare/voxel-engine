@@ -7,6 +7,8 @@ const core = mach.core;
 const This = @This();
 const log = std.log.scoped(.camera);
 
+// TODO: defaulting to undefined is bad, use an init function
+// TODO: get rid of descriptor variable or find better way of validating
 buff: *gpu.Buffer = undefined,
 bindgroup: *gpu.BindGroup = undefined,
 /// distance from screen, use set_fov change this
@@ -53,11 +55,13 @@ pub fn init_bindgroup(self: *This) *gpu.BindGroupLayout {
 
     self.bindgroup = blk: {
         const descriptor = gpu.BindGroup.Descriptor.init(.{
-            .entries = &[_]gpu.BindGroup.Entry{.{
-                .binding = 0,
-                .buffer = self.buff,
-                .size = @sizeOf(@TypeOf(self.uniform)),
-            }},
+            .entries = &[_]gpu.BindGroup.Entry{gpu.BindGroup.Entry.buffer(
+                0, 
+                self.buff, 
+                0, 
+                @sizeOf(@TypeOf(self.uniform)), 
+                0
+            )},
             .layout = camera_bindgroup_layout,
         });
         // TODO add validation
