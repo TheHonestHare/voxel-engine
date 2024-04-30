@@ -59,8 +59,7 @@ pub fn init_bindgroup(self: *This) *gpu.BindGroupLayout {
                 0, 
                 self.buff, 
                 0, 
-                @sizeOf(@TypeOf(self.uniform)), 
-                0
+                @sizeOf(@TypeOf(self.uniform))
             )},
             .layout = camera_bindgroup_layout,
         });
