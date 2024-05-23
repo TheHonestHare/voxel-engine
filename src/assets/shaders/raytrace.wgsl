@@ -5,12 +5,25 @@ struct Camera {
     lookat: vec3<f32>, //vector from eye to screen origin, scaled by screen_dist
 };
 
+struct WorldHeader {
+    size: vec3<u32>,
+}
+alias Brick = array<u32, 2>;
+
+struct Bitmasks {
+    bits: array<Brick>,
+}
+
 @group(0) @binding(0) var<uniform> camera: Camera;
 @group(1) @binding(0) var screen_tex: texture_storage_2d<rgba8unorm, write>;
+@group(2) @binding(0) var<uniform> world_header: WorldHeader;
+@group(2) @binding(1) var<storage, read> bitmasks: Bitmasks;
 
 const max_dist: f32 = 1000.;
 
 const pi: f32 = 3.14159265358979323846264338327950288419716939937510;
+
+const brick_size = 4;
 
 @compute @workgroup_size(8,8,1)
 fn main(@builtin(local_invocation_id) local_id: vec3<u32>,
@@ -25,7 +38,6 @@ fn main(@builtin(local_invocation_id) local_id: vec3<u32>,
 }
 
 fn raytrace(coords: vec2<f32>, res: vec2<f32>) -> vec4<f32> {
-
     var uv: vec2<f32> = (2. * coords - res.xy) / res.y;
     var col: vec3<f32> = vec3<f32>(0.,0.,0.);
 
@@ -76,7 +88,8 @@ fn dda(origin: vec3<f32>, dir: vec3<f32>) -> OutDDA {
     return OutDDA(t, vec3<f32>(0.0));
 }
 
-const colours = array<vec3<f32>, 7>(
+const colours = array<vec3<f32>, 11>(
+    vec3<f32>(0.0,0.0,0.0),
     vec3<f32>(1.0,0.0,0.0),
     vec3<f32>(1.0,0.5,0.0),
     vec3<f32>(1.0,1.0,0.0),
@@ -84,21 +97,20 @@ const colours = array<vec3<f32>, 7>(
     vec3<f32>(0.0,0.2,0.8),
     vec3<f32>(0.2,0.0,0.8),
     vec3<f32>(0.5,0.0,0.5),
+    vec3<f32>(0.5,0.5,0.5),
+    vec3<f32>(1.0,1.0,1.0),
+    vec3<f32>(0.5,1.0,0.5),
 );
 
 fn get_voxel(pos: vec3<i32>) -> i32 {
-    // smiley :)
-    // if(all(pos == vec3<i32>(0))) { return 1; }
-    // if(all(pos == vec3<i32>(0, 0, 3))) { return 1; }
-    // if(all(pos == vec3<i32>(0,-2, 4))) { return 1; }
-    // if(all(pos == vec3<i32>(0,-3, 3))) { return 1; }
-    // if(all(pos == vec3<i32>(0,-3, 2))) { return 1; }
-    // if(all(pos == vec3<i32>(0,-3, 1))) { return 1; }
-    // if(all(pos == vec3<i32>(0,-3, 0))) { return 1; }
-    // if(all(pos == vec3<i32>(0,-2,-1))) { return 1; }
-
-    if(pos.y > i32(sin(f32(pos.z) / 10) * 10 + sin(f32(pos.x) / 10) * 10)) {return 0;}
-    return abs(pos.x) % 7 + 1;
+    if(any(pos < vec3i(0, 0, 0))) { return 1; }
+    if(any(pos > vec3<i32>(world_header.size * brick_size + 1))) { return 1;}
+    let pos_1 = vec3<u32>(pos) / brick_size;
+    let bottom_or_top = select(0, 1, pos.y % 4 > 1);
+    let brick = bitmasks.bits[pos_1.x * world_header.size.y * world_header.size.z + pos_1.y * world_header.size.z + pos_1.z][bottom_or_top];
+    let offset = u32((pos.z % 4) * brick_size + (pos.x % 4) + (pos.y % 2) * brick_size * brick_size);
+    if((brick & u32(1 << offset)) > 0) { return (pos.x % 4 + pos.y % 4 + pos.z % 4) + 2; }
+    return 0;
 }
 
 fn rot2d(ang: f32) -> mat2x2<f32> {

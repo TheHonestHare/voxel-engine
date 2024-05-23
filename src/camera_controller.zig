@@ -21,7 +21,7 @@ pub const Movement = struct {
 };
 
 velocity: f32 = 5,
-position: math.Vec3 = math.vec3(0, 0, 5),
+position: math.Vec3 = math.vec3(10, 10, 5),
 pitch: f32 = 0.0,
 yaw: f32 = 0.0,
 

@@ -2,12 +2,14 @@ const std = @import("std");
 const mach = @import("mach");
 const config = @import("config");
 const App = @import("./app.zig").App;
+const group = @import("./bindgroups.zig");
 const core = mach.core;
 const gpu = core.gpu;
 const math = mach.math;
-
+// TODO: move all bindgroup logic into bindgroups.zig etc
+// TODO: check if its ok to destroy pipeline layout on creation
 pub var camera = @import("./camera.zig"){};
-
+pub var gpu_world: @import("./gpu_world.zig") = undefined;
 const log = std.log.scoped(.render);
 
 // BIND GROUPS FOR RAYTRACING:
@@ -35,14 +37,13 @@ pub fn init() !void {
     core.setCursorMode(.disabled);
 
     create_raytrace_pipeline("./shaders/raytrace.wgsl", camera_bindgroup_layout) catch
-        if (config.validate)
-    {
-        core.setCursorMode(.normal);
-        create_raytrace_pipeline("./shaders/fallback_raytrace.wgsl", camera_bindgroup_layout) catch {
-            log.err("failed to initialise fallback", .{});
-            std.debug.panic("fallback failed to compile", .{});
-        };
-    } else unreachable;
+        if (config.validate) {
+            core.setCursorMode(.normal);
+            create_raytrace_pipeline("./shaders/fallback_raytrace.wgsl", camera_bindgroup_layout) catch {
+                log.err("failed to initialise fallback", .{});
+                std.debug.panic("fallback failed to compile", .{});
+            };
+        } else unreachable;
 
     // TODO: this should be under config.validate
     create_render_pipeline() catch {
@@ -58,6 +59,7 @@ fn create_bindgroups() !*gpu.BindGroupLayout {
     gen_screen_textures();
 
     const camera_bindgroup_layout = camera.init_bindgroup();
+    gpu_world.init();
     return camera_bindgroup_layout;
 }
 
@@ -81,7 +83,7 @@ fn create_raytrace_pipeline(comptime path: [:0]const u8, camera_bindgroup_layout
     raytrace_pipeline = blk: {
         const layout = blk2: {
             const descriptor = gpu.PipelineLayout.Descriptor.init(.{
-                .bind_group_layouts = &.{ camera_bindgroup_layout, raytrace_bindgroup_layout },
+                .bind_group_layouts = &.{ camera_bindgroup_layout, raytrace_bindgroup_layout, gpu_world.bindgroup_layout },
             });
             // TODO add validation
             break :blk2 core.device.createPipelineLayout(&descriptor);
@@ -257,6 +259,8 @@ pub fn update(app: *App) void {
         compute_pass.setPipeline(raytrace_pipeline);
         compute_pass.setBindGroup(0, camera.bindgroup, null);
         compute_pass.setBindGroup(1, raytrace_bindgroup, null);
+        compute_pass.setBindGroup(2, gpu_world.bindgroup, null);
+
         compute_pass.dispatchWorkgroups(screen_dimensions.width / 8 + 1, screen_dimensions.height / 8 + 1, 1);
     }
     {
