@@ -1,3 +1,6 @@
+// TODO: make override
+const BRICK_SIZE = 8;
+
 struct Camera {
     position: vec3<f32>,  //camera position
     plane_X: vec3<f32>, // vec from screen origin to right w.r.t orientation, normalized
@@ -8,22 +11,21 @@ struct Camera {
 struct WorldHeader {
     size: vec3<u32>,
 }
-alias Brick = array<u32, 2>;
+alias Brick = array<u32, BRICK_SIZE * BRICK_SIZE * BRICK_SIZE>;
 
-struct Bitmasks {
+struct Bricks {
     bits: array<Brick>,
 }
 
 @group(0) @binding(0) var<uniform> camera: Camera;
 @group(1) @binding(0) var screen_tex: texture_storage_2d<rgba8unorm, write>;
 @group(2) @binding(0) var<uniform> world_header: WorldHeader;
-@group(2) @binding(1) var<storage, read> bitmasks: Bitmasks;
+@group(2) @binding(1) var<storage, read> bitmasks: Bricks;
 
 const max_dist: f32 = 1000.;
 
 const pi: f32 = 3.14159265358979323846264338327950288419716939937510;
 
-const brick_size = 4;
 
 @compute @workgroup_size(8,8,1)
 fn main(@builtin(local_invocation_id) local_id: vec3<u32>,
@@ -103,13 +105,16 @@ const colours = array<vec3<f32>, 11>(
 );
 
 fn get_voxel(pos: vec3<i32>) -> i32 {
+    const HALF_BRICK_SIZE = BRICK_SIZE / 2;
     if(any(pos < vec3i(0, 0, 0))) { return 1; }
-    if(any(pos > vec3<i32>(world_header.size * brick_size + 1))) { return 1;}
-    let pos_1 = vec3<u32>(pos) / brick_size;
-    let bottom_or_top = select(0, 1, pos.y % 4 > 1);
-    let brick = bitmasks.bits[pos_1.x * world_header.size.y * world_header.size.z + pos_1.y * world_header.size.z + pos_1.z][bottom_or_top];
-    let offset = u32((pos.z % 4) * brick_size + (pos.x % 4) + (pos.y % 2) * brick_size * brick_size);
-    if((brick & u32(1 << offset)) > 0) { return (pos.x % 4 + pos.y % 4 + pos.z % 4) + 2; }
+    if(any(pos > vec3<i32>(world_header.size * BRICK_SIZE + 1))) { return 1;}
+    let pos_u = vec3<u32>(pos);
+    let pos_scaled = pos_u / BRICK_SIZE;
+    let sub_brick_pos = pos_u - pos_scaled * BRICK_SIZE;
+    // TODO: replace getting correct brick with an array of pointers and maybe get rid of modulo
+    // TODO: this code looks brick size independant, actually will only work on 8 bc makes assumptions like 32 bits takes up half of a layer
+    let bitmask = bitmasks.bits[dot(pos_scaled, vec3<u32>(1, BRICK_SIZE * BRICK_SIZE, BRICK_SIZE))][8 / (32 / BRICK_SIZE) * sub_brick_pos.y + u32(sub_brick_pos.z > (32 / BRICK_SIZE) - 1)];
+    if((bitmask & u32(1 << (HALF_BRICK_SIZE * sub_brick_pos.z + sub_brick_pos.x))) > 0) { return (pos.x % HALF_BRICK_SIZE + pos.y % HALF_BRICK_SIZE / 2 + pos.z % HALF_BRICK_SIZE) + 2; }
     return 0;
 }
 

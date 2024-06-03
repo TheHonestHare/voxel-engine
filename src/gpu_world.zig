@@ -8,7 +8,7 @@ const gpu = core.gpu;
 const math = mach.math;
 
 /// THIS WILL LIKELY BREAK EVERYTHING IF NOT 4
-const brickmap_size = 4;
+pub const brickmap_size = 8;
 
 const size_x = 512 / brickmap_size;
 const size_z = 512 / brickmap_size;
@@ -20,7 +20,11 @@ pub const HeaderLayout = extern struct {
     _pad: u32 = undefined,
 };
 /// The layout of the bitmasks used to determine if block is air or not
-/// Most negative is index 0, increases along x then z then y
+/// Each bitmap can be treated as 1 giant 8*8*8 = 512 bit integer in little endian
+/// The LSB (bitsmask & 1 << 0) is the smallest in x, y, and z
+/// First 8 bits are when z = 0, x = 0-7, y = 0
+/// Second 8 bits are when z = 1, x = 0-7, y = 0 etc
+/// Because WGSL only supports u32, we use that
 pub const BitMapLayout = extern struct {
     bitmasks: [size_x * size_y * size_z][brickmap_size * brickmap_size * brickmap_size / 32]u32,
 };
@@ -52,8 +56,8 @@ pub fn init(self: *@This()) void {
         .mapped_at_creation = .true,
     });
     const bit_buff = &bitmask_buff.getMappedRange(BitMapLayout, 0, 1).?[0];
-    @memset(&bit_buff.bitmasks, .{0x10001000, 0x10001000});
-    bit_buff.bitmasks[3] = .{0xFFFF0660, 0x06600660};
+    // @memset(&bit_buff.bitmasks, .{0x10001000, 0x10001000});
+    @memcpy(bit_buff.bitmasks[0][0..2], &[2]u32{0xFFFFFFFF, 0xFFFFFFFF});
     bitmask_buff.unmap();
 
     const bindgroup_layout = core.device.createBindGroupLayout(&gpu.BindGroupLayout.Descriptor.init(.{ .entries = &.{
