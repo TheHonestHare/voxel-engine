@@ -57,7 +57,7 @@ pub fn init(self: *@This()) void {
     });
     const bit_buff = &bitmask_buff.getMappedRange(BitMapLayout, 0, 1).?[0];
     // @memset(&bit_buff.bitmasks, .{0x10001000, 0x10001000});
-    @memcpy(bit_buff.bitmasks[0][0..2], &[2]u32{0xFFFFFFFF, 0xFFFFFFFF});
+    @memset(bit_buff.bitmasks[0][0..4], 0xFFFFFFF8);
     bitmask_buff.unmap();
 
     const bindgroup_layout = core.device.createBindGroupLayout(&gpu.BindGroupLayout.Descriptor.init(.{ .entries = &.{
