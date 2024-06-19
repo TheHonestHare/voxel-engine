@@ -119,40 +119,72 @@ fn get_voxel(pos: vec3<i32>) -> i32 {
 
 
 // dir must be normalized (TODO: check if thats true)
-fn dda_brickmaps(origin: vec3<f32>, dir: vec3<f32>) -> OutDDA {
+// origin is the position scaled to size of voxel
+// TODO: try removing curr_brick, might be slowing down
+// TODO: implement empty brick skipping
+// TODO: precompute masks to determine if any voxels exist in the path a ray could traverse
+fn dda_brickmaps(origin: vec3<f32>, dir_raw: vec3<f32>) -> OutDDA {
+    let dir = select(dir_raw, dir_raw + 0.0001, dir_raw == vec3<f32>(0));
     // how far along a ray will go for 1 unit step in each of the axis's
     let step_len: vec3<f32> = 1.0 / abs(dir);
     // checks the sign bit of dir; false if negative
     let step_mask = !vec3<bool>(bitcast<vec3<u32>>(dir) & vec3<u32>(0x80000000));
-    // what direction to step voxels in
-    let step_dir = select(vec3<f32>(-1), vec3<f32>(1), step_mask);
+    // what direction to step in
+    let step_dir = select(vec3<i32>(-1), vec3<i32>(1), step_mask);
+    let origin_brick = origin / BRICK_SIZE;
 
-    let origin_floor = floor(origin);
-    // TODO: decide if voxel coordinates will always be positive and maybe change to u32
-    //       if always positive, this can just be vec3<i32>(origin)
-    var ray_len: vec3<f32> = select(origin - floor(origin), ceil(origin) - origin, step_mask) * step_len;
-    var side: vec3<bool> = vec3<bool>(false);
-    var brick_coords: vec3<i32> = vec3<i32>(floor(origin / BRICK_SIZE));
-    var brick: Brick;
-
-    var t: f32 = 0;
-    //currently scuffed near 0
-    var curr_vox: vec3<i32> = abs(vec3<i32>(floor(origin))) % BRICK_SIZE;
-    for(var i: u32 = 0; i < 500/8; i += 1) {
-        if(!brick_exists(brick_coords)) { return OutDDA(0, vec3f(0.0)); }
-        brick = get_brick(brick_coords);
-        for(var j: u32 = 1; j < BRICK_SIZE * 3; j += 1) {
-            if(any(curr_vox < vec3<i32>(0)) || any(curr_vox > vec3<i32>(BRICK_SIZE - 1))) { 
-                brick_coords += vec3<i32>(side) * vec3<i32>(step_dir);
-                curr_vox = select(curr_vox, BRICK_SIZE - select(vec3i(0), vec3i(1), curr_vox == vec3i(7)) - abs(curr_vox), side);
-                break;
-            }
-            if(is_solid(brick, curr_vox)) { return OutDDA(0, colours[2]); }
-            dda_step_brickmap(&ray_len, step_dir, step_len, &curr_vox, &side);
-        }
-    }
+    var pos_brick: vec3<i32> = vec3<i32>(floor(origin_brick));
+    var curr_brick: Brick;
     
+    var ray_len_brick: vec3<f32> = select(origin_brick - floor(origin_brick), ceil(origin_brick) - origin_brick, step_mask) * step_len;
+    var side_brick: vec3<bool> = side_mask(ray_len_brick);
+    
+    var t_brick: f32 = 0;
+    for(var i: u32 = 0; i < 200; i++) {
+        if(!brick_exists(pos_brick)) { break; }
+        curr_brick = get_brick(pos_brick);
+        let intersect = select(fract( origin_brick + dir * t_brick + 0.0001 * vec3<f32>(step_dir)), fract(origin_brick), all(floor(origin_brick) == vec3<f32>(pos_brick))) * BRICK_SIZE;
+
+        // TODO: this shouldn't have to be var
+        var origin_vox: vec3<f32> = clamp(intersect, vec3<f32>(0.0001), vec3<f32>(BRICK_SIZE - 0.0001));
+        // for some reason origin_vox being whole number will cause blocks to incorrectly appear in the origin brick
+        origin_vox = select(origin_vox, origin_vox + 0.0001, origin_vox == floor(origin_vox));
+        var pos_vox: vec3<i32> = vec3<i32>(floor(origin_vox));
+        var ray_len_vox: vec3<f32> = select(origin_vox - floor(origin_vox), ceil(origin_vox) - origin_vox, step_mask) * step_len;
+        var side_vox: vec3<bool>;
+
+        var t_vox: f32 = 0;
+        while(!( any( pos_vox < vec3<i32>(0) ) || any( pos_vox > vec3<i32>(BRICK_SIZE - 1) ) )) {
+            if(is_solid(curr_brick, pos_vox)) { return OutDDA(0, uv_face(origin_vox + dir * t_vox, side_vox)); }
+
+            side_vox = side_mask(ray_len_vox);
+            pos_vox += vec3<i32>(side_vox) * step_dir;
+            t_vox = dot(ray_len_vox, vec3<f32>(side_vox));
+            ray_len_vox += vec3<f32>(side_vox) * step_len;
+        }
+
+        side_brick = side_mask(ray_len_brick);
+        pos_brick += vec3<i32>(side_brick) * step_dir;
+        t_brick = dot(ray_len_brick, vec3<f32>(side_brick));
+        ray_len_brick += vec3<f32>(side_brick) * step_len;
+    }
     return OutDDA(0, vec3<f32>(0.0));
+}
+
+// https://www.shadertoy.com/view/lfyGRW
+fn side_mask(side_dist: vec3<f32>) -> vec3<bool> {
+    /*let min_side = min(side_dist.x, min(side_dist.y, side_dist.z));
+    if(min_side == side_dist.x) { return vec3<bool>(true, false, false); }
+    else if(min_side == side_dist.y) { return vec3<bool>(false, true, false);}
+    else { return vec3<bool>(false, false, true); }*/
+    var mask: vec3<bool>;
+    let b1 = side_dist.xyz < side_dist.yzx;
+    let b2 = side_dist.xyz <= side_dist.zxy;
+    mask.z = b1.z && b2.z;
+    mask.x = b1.x && b2.x;
+    mask.y = b1.y && b2.y;
+    if(!any(mask)) { mask.z = true; }
+    return mask;
 }
 
 fn brick_exists(pos: vec3<i32>) -> bool {
@@ -163,22 +195,13 @@ fn get_brick(pos: vec3<i32>) -> Brick {
     return bitmasks.bits[dot(pos, vec3<i32>(1, BRICK_SIZE * BRICK_SIZE, BRICK_SIZE))];
 }
 
-// https://www.shadertoy.com/view/4dX3zl
-fn dda_step_brickmap(ray_len_ptr: ptr<function, vec3<f32>>, step_dir: vec3<f32>, step_len: vec3<f32>, curr_vox_ptr: ptr<function, vec3<i32>>, side_ptr: ptr<function, vec3<bool>>) {
-    *side_ptr = (*ray_len_ptr).xyz <= min((*ray_len_ptr).yzx, (*ray_len_ptr).zxy);
-    *curr_vox_ptr += vec3<i32>(*side_ptr) * vec3<i32>(step_dir);
-    *ray_len_ptr += vec3<f32>(*side_ptr) * step_len;
-}
-/*
-fn uv_face(ray_end_pos: vec3<f32>, side: vec3<bool>) -> vec2<f32> {
 
-    if(side.x) { return vec3<f32>(fract(vec3<f32>(origin.yz + t * dir.yz), 0.0)); }
-    if(side.y) { return vec3<f32>(fract(vec3<f32>(origin.xz + t * dir.xz), 0.0)); }
-     { return vec3<f32>(fract(vec3<f32>(origin.xy + t * dir.xy), 0.0)); } // SIDE_Z
-     
-     
-    return vec3<f32>(fract(vec3<f32>(origin.yz + t * dir.yz), 0.0));
-}*/
+fn uv_face(ray_end_pos: vec3<f32>, side: vec3<bool>) -> vec3<f32> {
+
+    if(side.x) { return vec3<f32>(fract(ray_end_pos.yz), 0.0); }
+    if(side.y) { return vec3<f32>(fract(ray_end_pos.xz), 0.0); }
+    { return vec3<f32>(fract(ray_end_pos.xy), 0.0); } // SIDE_Z
+}
 
 fn is_solid(brick: Brick, curr_vox: vec3<i32>) -> bool {
     // TODO: remove this assert?
