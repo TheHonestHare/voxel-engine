@@ -143,7 +143,7 @@ fn dda_brickmaps(origin: vec3<f32>, dir_raw: vec3<f32>) -> OutDDA {
     for(var i: u32 = 0; i < 200; i++) {
         if(!brick_exists(pos_brick)) { break; }
         curr_brick = get_brick(pos_brick);
-        let intersect = select(fract( origin_brick + dir * t_brick + 0.0001 * vec3<f32>(step_dir)), fract(origin_brick), all(floor(origin_brick) == vec3<f32>(pos_brick))) * BRICK_SIZE;
+        let intersect = select(origin_brick + dir * t_brick - vec3<f32>(pos_brick), origin_brick - vec3<f32>(pos_brick), all(floor(origin_brick) == vec3<f32>(pos_brick))) * BRICK_SIZE;
 
         // TODO: this shouldn't have to be var
         var origin_vox: vec3<f32> = clamp(intersect, vec3<f32>(0.0001), vec3<f32>(BRICK_SIZE - 0.0001));
@@ -151,12 +151,10 @@ fn dda_brickmaps(origin: vec3<f32>, dir_raw: vec3<f32>) -> OutDDA {
         origin_vox = select(origin_vox, origin_vox + 0.0001, origin_vox == floor(origin_vox));
         var pos_vox: vec3<i32> = vec3<i32>(floor(origin_vox));
         var ray_len_vox: vec3<f32> = select(origin_vox - floor(origin_vox), ceil(origin_vox) - origin_vox, step_mask) * step_len;
-        var side_vox: vec3<bool>;
-
+        var side_vox = side_brick;
         var t_vox: f32 = 0;
         while(!( any( pos_vox < vec3<i32>(0) ) || any( pos_vox > vec3<i32>(BRICK_SIZE - 1) ) )) {
-            if(is_solid(curr_brick, pos_vox)) { return OutDDA(0, uv_face(origin_vox + dir * t_vox, side_vox)); }
-
+            if(is_solid(curr_brick, pos_vox)) { return OutDDA(0, uv_face(vec3<f32>(origin_vox + t_vox * dir), side_vox)); }
             side_vox = side_mask(ray_len_vox);
             pos_vox += vec3<i32>(side_vox) * step_dir;
             t_vox = dot(ray_len_vox, vec3<f32>(side_vox));
