@@ -134,13 +134,13 @@ fn dda_brickmaps(origin: vec3<f32>, dir_raw: vec3<f32>) -> OutDDA {
     let origin_brick = origin / BRICK_SIZE;
 
     var pos_brick: vec3<i32> = vec3<i32>(floor(origin_brick));
-    var curr_brick: Brick;
+    var curr_brick: i32;
     
     var ray_len_brick: vec3<f32> = select(origin_brick - floor(origin_brick), ceil(origin_brick) - origin_brick, step_mask) * step_len;
     var side_brick: vec3<bool> = side_mask(ray_len_brick);
     
     var t_brick: f32 = 0;
-    for(var i: u32 = 0; i < 200; i++) {
+    while(t_brick < 200 / BRICK_SIZE) {
         if(!brick_exists(pos_brick)) { break; }
         curr_brick = get_brick(pos_brick);
         let intersect = select(origin_brick + dir * t_brick - vec3<f32>(pos_brick), origin_brick - vec3<f32>(pos_brick), all(floor(origin_brick) == vec3<f32>(pos_brick))) * BRICK_SIZE;
@@ -189,8 +189,8 @@ fn brick_exists(pos: vec3<i32>) -> bool {
     return !(any(pos < vec3i(0, 0, 0)) || any(vec3<u32>(pos) >= world_header.size));
 }
 
-fn get_brick(pos: vec3<i32>) -> Brick {
-    return bitmasks.bits[dot(pos, vec3<i32>(1, BRICK_SIZE * BRICK_SIZE, BRICK_SIZE))];
+fn get_brick(pos: vec3<i32>) -> i32 {
+    return dot(pos, vec3<i32>(1, BRICK_SIZE * BRICK_SIZE, BRICK_SIZE));
 }
 
 
@@ -201,11 +201,11 @@ fn uv_face(ray_end_pos: vec3<f32>, side: vec3<bool>) -> vec3<f32> {
     { return vec3<f32>(fract(ray_end_pos.xy), 0.0); } // SIDE_Z
 }
 
-fn is_solid(brick: Brick, curr_vox: vec3<i32>) -> bool {
+fn is_solid(brick: i32, curr_vox: vec3<i32>) -> bool {
     // TODO: remove this assert?
     if(any(curr_vox < vec3<i32>(0)) || any(curr_vox > vec3<i32>(BRICK_SIZE - 1))) { return false; }
 
-    return bool(brick[8 / (32 / BRICK_SIZE) * u32(curr_vox.y) + u32(curr_vox.z > (32 / BRICK_SIZE) - 1)] & u32(1 << (BRICK_SIZE / 2 * u32(curr_vox.z) + u32(curr_vox.x))));
+    return bool(bitmasks.bits[brick][8 / (32 / BRICK_SIZE) * u32(curr_vox.y) + u32(curr_vox.z > (32 / BRICK_SIZE) - 1)] & u32(1 << (BRICK_SIZE / 2 * u32(curr_vox.z) + u32(curr_vox.x))));
 }
 
 const colours = array<vec3<f32>, 11>(
