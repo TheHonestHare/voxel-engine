@@ -55,12 +55,7 @@ pub fn init_bindgroup(self: *This) *gpu.BindGroupLayout {
 
     self.bindgroup = blk: {
         const descriptor = gpu.BindGroup.Descriptor.init(.{
-            .entries = &[_]gpu.BindGroup.Entry{gpu.BindGroup.Entry.buffer(
-                0, 
-                self.buff, 
-                0, 
-                @sizeOf(@TypeOf(self.uniform))
-            )},
+            .entries = &[_]gpu.BindGroup.Entry{gpu.BindGroup.Entry.buffer(0, self.buff, 0, @sizeOf(@TypeOf(self.uniform)))},
             .layout = camera_bindgroup_layout,
         });
         // TODO add validation

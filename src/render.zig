@@ -1,9 +1,10 @@
 const std = @import("std");
 const mach = @import("mach");
 const config = @import("config");
-const App = @import("./app.zig").App;
+const App = @import("./app.zig");
+const gpu = mach.gpu;
+const Core = mach.Core;
 const core = mach.core;
-const gpu = core.gpu;
 const math = mach.math;
 
 pub var camera = @import("./camera.zig"){};
@@ -124,7 +125,11 @@ fn create_render_pipeline() !void {
     };
     defer shader_module.release();
 
-    const colour_target: gpu.ColorTargetState = .{ .format = core.descriptor.format };
+    const blend: gpu.BlendState = .{};
+    const colour_target: gpu.ColorTargetState = .{
+        .format = core.descriptor.format,
+        .blend = &blend,
+    };
     const frag = gpu.FragmentState.init(.{
         .module = shader_module,
         .entry_point = "frag_main",
@@ -220,7 +225,7 @@ pub fn deinit() void {
     camera.deinit();
 }
 
-pub fn update(app: *App) void {
+pub fn update(game: *App.Mod, core_mod: *mach.Core.Mod) void {
     const queue = core.queue;
     const canvas_texture = core.swap_chain.getCurrentTexture().?;
     defer canvas_texture.release();
@@ -243,7 +248,7 @@ pub fn update(app: *App) void {
     const encoder = core.device.createCommandEncoder(null);
     defer encoder.release();
 
-    const time = app.timer.read() / 2.0;
+    const time = game.state().timer.read() / 2.0;
     _ = time; // autofix
     //log.debug("CameraX: {d} {d} {d}",.{camera.uniform.plane_X.x(), camera.uniform.plane_X.y(), camera.uniform.plane_X.z()});
 
@@ -272,7 +277,7 @@ pub fn update(app: *App) void {
     var command = encoder.finish(null);
     defer command.release();
     queue.submit(&[_]*gpu.CommandBuffer{command});
-    core.swap_chain.present();
+    core_mod.schedule(.present_frame);
 }
 
 inline fn error_callback(valid: *bool, error_type: gpu.ErrorType, message: [*:0]const u8) void {
