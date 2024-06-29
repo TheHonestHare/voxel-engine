@@ -3,7 +3,6 @@ const mach = @import("mach");
 const config = @import("config");
 const App = @import("./app.zig");
 const gpu = mach.gpu;
-const Core = mach.Core;
 const core = mach.core;
 const math = mach.math;
 
