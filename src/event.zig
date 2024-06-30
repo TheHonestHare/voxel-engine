@@ -5,22 +5,22 @@ const config = @import("config");
 const render = @import("./render.zig");
 
 const log = std.log.scoped(.events);
-const core = mach.core;
 
-pub fn handle_events(movement: *CameraController.Movement) bool {
-    var iter = core.pollEvents();
+pub fn handle_events(movement: *CameraController.Movement, core: *mach.Core.Mod) void {
+    var iter = mach.core.pollEvents();
     while (iter.next()) |e| {
         switch (e) {
-            .close => return true,
-            .key_press => |key| if (input_press(movement, key)) return true,
-            .key_release => |key| if (input_release(movement, key)) return true,
+            .close => break,
+            .key_press => |key| if (input_press(movement, key)) break,
+            .key_release => |key| if (input_release(movement, key)) break,
             else => {},
         }
-    }
-    return false;
+    } else return;
+    core.schedule(.exit);
+    return;
 }
 
-fn input_press(movement: *CameraController.Movement, key: core.KeyEvent) bool {
+fn input_press(movement: *CameraController.Movement, key: mach.core.KeyEvent) bool {
     switch (key.key) {
         .escape => return true,
         .k => if (config.dev) {
@@ -39,7 +39,7 @@ fn input_press(movement: *CameraController.Movement, key: core.KeyEvent) bool {
     return false;
 }
 
-fn input_release(movement: *CameraController.Movement, key: core.KeyEvent) bool {
+fn input_release(movement: *CameraController.Movement, key: mach.core.KeyEvent) bool {
     switch (key.key) {
         .w => movement.fowards = false,
         .a => movement.left = false,

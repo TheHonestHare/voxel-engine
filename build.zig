@@ -8,13 +8,9 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const mach_dep = b.dependency("mach", .{ .target = target, .optimize = optimize, .core = true });
-
     const dev = !(b.option(bool, "no_dev", "disables development features") orelse false);
     const options = b.addOptions();
     options.addOption(bool, "dev", dev);
-    const config = options.createModule();
-    _ = config; // autofix
 
     const assets_dir = b.option([]const u8, "assets_dir", "path to assets folder") orelse "\\..\\..\\src\\assets";
     options.addOption([]const u8, "assets_dir", assets_dir);
@@ -22,27 +18,33 @@ pub fn build(b: *std.Build) !void {
     const validation = !(b.option(bool, "no_validation", "disables validation checking") orelse false);
     options.addOption(bool, "validate", validation);
 
-    const app = try mach.CoreApp.init(b, mach_dep.builder, .{
+
+    const exe = b.addExecutable(.{
         .name = "voxel_renderer",
-        .src = "src/app.zig",
-        .custom_entrypoint = "src/entrypoint.zig",
+        .root_source_file = b.path("./src/entrypoint.zig"),
         .target = target,
         .optimize = optimize,
-        //.deps = &[_]std.Build.Module.Import{.{.module = options.createModule(), .name = "config"}},
     });
 
-    if (!dev) {
-        app.compile.subsystem = .Windows;
-    }
-    app.compile.root_module.addOptions("config", options);
+    exe.root_module.addOptions("config", options);
 
-    if (b.args) |args| app.run.addArgs(args);
+    const mach_dep = b.dependency("mach", .{ .target = target, .optimize = optimize, .core = true });
+    @import("mach").link(mach_dep.builder, exe);
+
+    exe.root_module.addImport("mach", mach_dep.module("mach"));
+
+    if (!dev) {
+        exe.subsystem = .Windows;
+    }
+    exe.root_module.addOptions("config", options);
+    b.installArtifact(exe);
+
 
     const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&app.run.step);
+    run_step.dependOn(&b.addRunArtifact(exe).step);
 
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("./src/app.zig"),
         .target = target,
         .optimize = optimize,
     });
