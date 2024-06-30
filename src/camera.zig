@@ -1,6 +1,7 @@
 const std = @import("std");
 const mach = @import("mach");
 const config = @import("config");
+const groups = @import("./bindgroups.zig");
 const gpu = mach.gpu;
 const math = mach.math;
 const core = mach.core;
@@ -9,12 +10,8 @@ const log = std.log.scoped(.camera);
 
 // TODO: defaulting to undefined is bad, use an init function
 // TODO: get rid of descriptor variable or find better way of validating
-buff: *gpu.Buffer = undefined,
-bindgroup: *gpu.BindGroup = undefined,
-/// distance from screen, use set_fov change this
-screen_dist: f32 = 0.7,
 
-uniform: extern struct {
+pub const BindGroup = extern struct {
     position: math.Vec3, // camera position
     //_pad: u32,
     plane_X: math.Vec3, // vec from screen origin to right w.r.t orientation, normalized
@@ -23,8 +20,15 @@ uniform: extern struct {
     //_pad2: u32,
     lookat: math.Vec3, // vector from eye to screen origin, scaled by screen_dist
     //_pad3: u32,
-} = undefined,
+};
 
+buff: *gpu.Buffer = undefined,
+bindgroup: *gpu.BindGroup = undefined,
+/// distance from screen, use set_fov change this
+screen_dist: f32 = 0.7,
+
+uniform: BindGroup = undefined,
+// TODO: returning bindgrouplayout is such a hack just return buff, bindgroup, bindgrouplayout
 pub fn init_bindgroup(self: *This) *gpu.BindGroupLayout {
     self.buff = blk: {
         const descriptor: gpu.Buffer.Descriptor = .{
@@ -42,11 +46,11 @@ pub fn init_bindgroup(self: *This) *gpu.BindGroupLayout {
     const camera_bindgroup_layout = blk: {
         const descriptor = gpu.BindGroupLayout.Descriptor.init(.{
             .entries = &.{gpu.BindGroupLayout.Entry.buffer(
-                0,
+                groups.group_0.camera.binding,
                 .{ .compute = true },
                 .uniform,
                 false,
-                @sizeOf(@TypeOf(self.uniform)),
+                @sizeOf(groups.group_0.camera.layout),
             )},
         });
         // TODO add validation
@@ -55,7 +59,7 @@ pub fn init_bindgroup(self: *This) *gpu.BindGroupLayout {
 
     self.bindgroup = blk: {
         const descriptor = gpu.BindGroup.Descriptor.init(.{
-            .entries = &[_]gpu.BindGroup.Entry{gpu.BindGroup.Entry.buffer(0, self.buff, 0, @sizeOf(@TypeOf(self.uniform)))},
+            .entries = &[_]gpu.BindGroup.Entry{gpu.BindGroup.Entry.buffer(0, self.buff, 0, @sizeOf(BindGroup))},
             .layout = camera_bindgroup_layout,
         });
         // TODO add validation
