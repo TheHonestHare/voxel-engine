@@ -7,6 +7,11 @@
             .url = "https://pkg.machengine.org/mach/b72f0e11b6d292c2b60789359a61f7ee6d7dc371.tar.gz",
             .hash = "122015e1dac4afaf275f7f2adde3814e6a27f5799cbef96bb487ee305f7e33f4dca3",
         },
+        // TODO: choose a specific commit instead of master for mach nominated sake
+        .zware = .{
+            .url = "https://github.com/malcolmstill/zware/archive/refs/heads/master.tar.gz",
+            .hash = "1220111dbf520f29c3fd7f96853fa20ce43e46c2c73e021bcbb3ea5fb931c84034be",
+        },
     },
 
     .paths = .{

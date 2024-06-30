@@ -30,8 +30,13 @@ pub fn build(b: *std.Build) !void {
 
     const mach_dep = b.dependency("mach", .{ .target = target, .optimize = optimize, .core = true });
     @import("mach").link(mach_dep.builder, exe);
-
     exe.root_module.addImport("mach", mach_dep.module("mach"));
+    
+    if(!target.result.isWasm()) {
+        const zware_dep = b.dependency("zware", .{.target = target, .optimize = optimize});
+        exe.root_module.addImport("zware", zware_dep.module("zware"));
+    } else return error.WasmNotSupportedYet;
+    
 
     if (!dev) {
         exe.subsystem = .Windows;
