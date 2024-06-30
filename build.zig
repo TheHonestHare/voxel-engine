@@ -32,7 +32,7 @@ pub fn build(b: *std.Build) !void {
     });
 
     if (!dev) {
-        //app.compile.subsystem = .Windows;
+        app.compile.subsystem = .Windows;
     }
     app.compile.root_module.addOptions("config", options);
 
