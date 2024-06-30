@@ -4,7 +4,7 @@ const config = @import("config");
 const groups = @import("./bindgroups.zig");
 
 const core = mach.core;
-const gpu = core.gpu;
+const gpu = mach.gpu;
 const math = mach.math;
 
 /// THIS WILL LIKELY BREAK EVERYTHING IF NOT 4
