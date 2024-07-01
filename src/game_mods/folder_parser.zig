@@ -2,7 +2,7 @@ const std = @import("std");
 const util = @import("./util.zig");
 
 /// the format for what modmeta.json should hold
-pub const metaJSONFormat_0 = struct {
+pub const MetaJSONFormat_0 = struct {
     /// name of the mod (optional)
     name: []const u8 = "MyMod",
     /// some string to designate version (optional)
@@ -27,16 +27,16 @@ pub fn readModDir(allocator: std.mem.Allocator, dir: std.fs.Dir) !void {
     //we don't have to check hash lengths because std.json does that while trying to fit the array into util.HashBase64
 }
 
-pub fn readModMetaJSON(allocator: std.mem.Allocator, dir: std.fs.Dir) !std.json.Parsed(metaJSONFormat_0) {
+pub fn readModMetaJSON(allocator: std.mem.Allocator, dir: std.fs.Dir) !std.json.Parsed(MetaJSONFormat_0) {
     var mod_meta_json = try util.readJSONFile(std.json.Value, allocator, dir, "./modmeta.json");
     defer mod_meta_json.deinit();
 
     return parseModMetaValue(allocator, &mod_meta_json.value);
 }
 
-fn parseModMetaValue(allocator: std.mem.Allocator, src: *std.json.Value) !std.json.Parsed(metaJSONFormat_0) {
+fn parseModMetaValue(allocator: std.mem.Allocator, src: *std.json.Value) !std.json.Parsed(MetaJSONFormat_0) {
     return if (src.object.fetchSwapRemove("ver")) |pair| switch (pair.value) {
-        .integer => |val| if (val != 0) error.UnsupportedModVersion else std.json.parseFromValue(metaJSONFormat_0, allocator, src.*, .{ .ignore_unknown_fields = true }),
+        .integer => |val| if (val != 0) error.UnsupportedModVersion else std.json.parseFromValue(MetaJSONFormat_0, allocator, src.*, .{ .ignore_unknown_fields = true }),
         else => error.InvalidModMetaJSON,
     } else error.InvalidModMetaJSON;
 }
