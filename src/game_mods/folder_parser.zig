@@ -21,10 +21,13 @@ pub fn readModDir(allocator: std.mem.Allocator, dir: std.fs.Dir) !void {
     const mod_meta_json = try readModMetaJSON(allocator, dir);
     defer mod_meta_json.deinit();
 
-    const hash_buf = util.encodeU64ToBase64(try hashModFolder(allocator, dir));
-    if(!std.mem.eql(u8, &hash_buf, &mod_meta_json.value.hash)) return error.WrongHash;
-
+    if(!isCorrectHash(allocator, dir, mod_meta_json.value.hash)) return error.WrongHash;
     //we don't have to check hash lengths because std.json does that while trying to fit the array into util.HashBase64
+}
+
+pub fn isCorrectHash(allocator: std.mem.Allocator, dir: std.fs.Dir, str: util.HashBase64) bool {
+    const hash_buf = util.encodeU64ToBase64(try hashModFolder(allocator, dir));
+    return std.mem.eql(u8, &hash_buf, &str);
 }
 
 pub fn readModMetaJSON(allocator: std.mem.Allocator, dir: std.fs.Dir) !std.json.Parsed(MetaJSONFormat_0) {
