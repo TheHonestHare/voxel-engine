@@ -15,19 +15,27 @@ pub fn readJSONFile(comptime OutType: type, allocator: std.mem.Allocator, dir: s
 }
 
 pub const base64_of_u64_size = std.base64.url_safe_no_pad.Encoder.calcSize(@sizeOf(u64));
-pub fn encodeU64ToBase64(n: u64) [base64_of_u64_size]u8 {
-    var hash_buf: [base64_of_u64_size]u8 = undefined;
+// TODO: determine if using a slice is more efficient than storing in place in MetaJSONFormat_0
+pub const HashBase64 = [base64_of_u64_size]u8;
+pub fn encodeU64ToBase64(n: u64) HashBase64 {
+    var hash_buf: HashBase64 = undefined;
     // just assume everythings little endian bc mach doesn't even work on big I think
     _ = std.base64.url_safe_no_pad.Encoder.encode(hash_buf[0..], &@as([@sizeOf(u64)]u8, @bitCast(n)));
     return hash_buf;
 }
 
-pub fn decodeBase64ToU64(str: [base64_of_u64_size]u8) !u64 {
+pub fn decodeBase64ToU64(str: HashBase64) !u64 {
     comptime std.debug.assert(std.base64.url_safe_no_pad.Decoder.calcSizeUpperBound(str.len) catch unreachable == @sizeOf(u64));
     var out: u64 = undefined;
     // just assume everythings little endian bc mach doesn't even work on big I think
     try std.base64.url_safe_no_pad.Decoder.decode(std.mem.sliceAsBytes((&out)[0..1]), &str);
     return out;
+}
+
+/// returns if the base64 hash provided will actually fit into a u64
+/// TODO: make sure I'm not just lying about that
+pub fn isValidBase64Hash(str: []const u8) bool {
+    return str.len <= base64_of_u64_size;
 }
 
 test "base64 test" {

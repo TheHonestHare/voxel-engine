@@ -12,9 +12,9 @@ pub const metaJSONFormat_0 = struct {
     /// description of the mod (optional)
     desc: []const u8 = "No description provided",
     /// base64 encoded hash of the contents of the dir (computed in hashModFolder)
-    hash: []const u8,
+    hash: util.HashBase64,
     /// array of hashes of its dependents
-    deps: []const []const u8 = &.{&.{}},
+    deps: []const util.HashBase64 = &.{},
 };
 
 pub fn readModDir(allocator: std.mem.Allocator, dir: std.fs.Dir) !void {
@@ -22,7 +22,9 @@ pub fn readModDir(allocator: std.mem.Allocator, dir: std.fs.Dir) !void {
     defer mod_meta_json.deinit();
 
     const hash_buf = util.encodeU64ToBase64(try hashModFolder(allocator, dir));
-    if(!std.mem.eql(u8, &hash_buf, mod_meta_json.value.hash)) return error.WrongHash;
+    if(!std.mem.eql(u8, &hash_buf, &mod_meta_json.value.hash)) return error.WrongHash;
+
+    //we don't have to check hash lengths because std.json does that while trying to fit the array into util.HashBase64
 }
 
 pub fn readModMetaJSON(allocator: std.mem.Allocator, dir: std.fs.Dir) !std.json.Parsed(metaJSONFormat_0) {
