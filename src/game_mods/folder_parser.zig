@@ -21,7 +21,7 @@ pub fn readModDir(allocator: std.mem.Allocator, dir: std.fs.Dir) !void {
     const mod_meta_json = try readModMetaJSON(allocator, dir);
     defer mod_meta_json.deinit();
 
-    const hash_buf = try hashModFolderBase64(allocator, dir);
+    const hash_buf = util.encodeU64ToBase64(try hashModFolder(allocator, dir));
     if(!std.mem.eql(u8, &hash_buf, mod_meta_json.value.hash)) return error.WrongHash;
 }
 
@@ -39,14 +39,6 @@ fn parseModMetaValue(allocator: std.mem.Allocator, src: *std.json.Value) !std.js
     } else error.InvalidModMetaJSON;
 }
 
-const base64_out_size = std.base64.url_safe_no_pad.Encoder.calcSize(@sizeOf(u64));
-/// Puts the hash for use in hash field of modmeta.json into outbuffer
-pub fn hashModFolderBase64(allocator: std.mem.Allocator, dir: std.fs.Dir) ![base64_out_size]u8 {
-    //throw away because out_buffer is perfect size
-    var hash_buf: [base64_out_size]u8 = undefined;
-    _ = std.base64.url_safe_no_pad.Encoder.encode(hash_buf[0..], &@as([@sizeOf(u64)]u8, @bitCast(try hashModFolder(allocator, dir))));
-    return hash_buf;
-}
 pub const skip_hash_files = .{"modmeta.json", "thumb.bmp"};
 /// Computes the hash of a directory, ignoring files in skip_hash_files
 /// Doesn't check for file names / other metadata, only the contents
