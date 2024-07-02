@@ -1,32 +1,82 @@
 const std = @import("std");
 const util = @import("./util.zig");
 
+pub const MetaData = struct {
+    /// name of the mod (taken from directory name)
+    name: []const u8,
+    /// some string to designate version (optional)
+    modversion: []const u8,
+    /// author of the mod (optional)
+    author: []const u8,
+    /// description of the mod (optional)
+    desc: []const u8,
+    /// base64 encoded hash of the contents of the dir (computed in hashModFolder)
+    hash: u64,
+    /// array of hashes of its dependents
+    deps: ?[]const u64,
+
+    /// Remember to call deinit
+    pub fn init(allocator: std.mem.Allocator, modmeta: MetaJSONFormat_0, mod: []const u8) !@This() {
+        return ret: {
+            var tmp: @This() = undefined;
+            tmp.name = try allocator.dupe(u8, mod);
+            errdefer allocator.free(tmp.name);
+            tmp.modversion = try allocator.dupe(u8, modmeta.modversion orelse "No version");
+            errdefer allocator.free(tmp.modversion);
+            tmp.author = try allocator.dupe(u8, modmeta.author orelse "No author");
+            errdefer allocator.free(tmp.author);
+            tmp.desc = try allocator.dupe(u8, modmeta.desc orelse "No description");
+            errdefer allocator.free(tmp.desc);
+            tmp.hash = try util.decodeBase64ToU64(modmeta.hash);
+
+            tmp.deps = if(modmeta.deps) |val| blk: {
+                const tmp1 = try allocator.alloc(u64, val.len);
+                errdefer allocator.free(tmp1);
+
+                for(tmp1, val) |*dst, src| dst.* = try util.decodeBase64ToU64(src);
+                break :blk tmp1;
+            } else null;
+            break :ret tmp;
+        };
+    }
+
+    pub fn deinit(self: MetaData, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+        allocator.free(self.modversion);
+        allocator.free(self.author);
+        allocator.free(self.desc);
+        allocator.free(self.deps orelse return);
+    }
+};
+
 /// the format for what modmeta.json should hold
 pub const MetaJSONFormat_0 = struct {
-    /// name of the mod (optional)
-    name: []const u8 = "MyMod",
     /// some string to designate version (optional)
-    modversion: []const u8 = "NoVersion",
+    modversion: ?[]const u8 = null,
     /// author of the mod (optional)
-    author: []const u8 = "No author",
+    author: ?[]const u8 = null,
     /// description of the mod (optional)
-    desc: []const u8 = "No description provided",
+    desc: ?[]const u8 = null,
     /// base64 encoded hash of the contents of the dir (computed in hashModFolder)
     hash: util.HashBase64,
     /// array of hashes of its dependents
-    deps: []const util.HashBase64 = &.{},
+    deps: ?[]const util.HashBase64 = null,
 };
 
-pub fn readModDir(allocator: std.mem.Allocator, dir: std.fs.Dir) !void {
-    const mod_meta_json = try readModMetaJSON(allocator, dir);
+pub fn readModDir(allocator: std.mem.Allocator, all_mods_dir: std.fs.Dir, mod: []const u8 ) !MetaData {
+    var mod_dir = try all_mods_dir.openDir(mod, .{ .iterate = true });
+    defer mod_dir.close();
+    const mod_meta_json = try readModMetaJSON(allocator, mod_dir);
     defer mod_meta_json.deinit();
 
-    if(!isCorrectHash(allocator, dir, mod_meta_json.value.hash)) return error.WrongHash;
+    if(!isCorrectHash(allocator, mod_dir, mod_meta_json.value.hash)) return error.WrongHash;
+
+    return MetaData.init(allocator, mod_meta_json.value, mod);
     //we don't have to check hash lengths because std.json does that while trying to fit the array into util.HashBase64
 }
 
 pub fn isCorrectHash(allocator: std.mem.Allocator, dir: std.fs.Dir, str: util.HashBase64) bool {
-    const hash_buf = util.encodeU64ToBase64(try hashModFolder(allocator, dir));
+    const hash_buf = util.encodeU64ToBase64(hashModFolder(allocator, dir) catch return false);
     return std.mem.eql(u8, &hash_buf, &str);
 }
 
@@ -66,7 +116,17 @@ pub fn hashModFolder(allocator: std.mem.Allocator, dir: std.fs.Dir) !u64 {
 // TODO: integrate with zig build test or smth
 test readModDir {
     // TODO: maybe generate the test folder dynamically / this seems ugly / don't rely on cwd
-    var example_mod_dir = try std.fs.cwd().openDir("./src/testing/example_mod", .{.iterate = true});
+    var example_mod_dir = try std.fs.cwd().openDir("./src/testing/example_all_mods", .{});
     defer example_mod_dir.close();
-    try readModDir(std.testing.allocator, example_mod_dir);
+    const out = try readModDir(std.testing.allocator, example_mod_dir, "example_mod");
+    defer out.deinit(std.testing.allocator);
+    const expected: MetaData = .{
+        .name = "example_mod",
+        .modversion = "No version",
+        .author = "No author",
+        .desc = "No description",
+        .hash = 679187453357837628,
+        .deps = null,
+    };
+    try std.testing.expectEqualDeep(out, expected);
 }
