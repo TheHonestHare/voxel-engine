@@ -156,6 +156,7 @@ fn parseModMetaValue(allocator: std.mem.Allocator, src: *std.json.Value) !std.js
 pub const skip_hash_files = .{ "modmeta.json", "thumb.bmp" };
 /// Computes the hash of a directory, ignoring files in skip_hash_files
 /// Doesn't check for file names / other metadata, only the contents
+/// Will not return 0 as a value, so collections can use 0 as an empty element
 pub fn hashModFolder(allocator: std.mem.Allocator, dir: std.fs.Dir) !u64 {
     var walker = try dir.walk(allocator);
     defer walker.deinit();
@@ -168,7 +169,8 @@ pub fn hashModFolder(allocator: std.mem.Allocator, dir: std.fs.Dir) !u64 {
         defer allocator.free(contents);
         curr_hash ^= std.hash.CityHash64.hash(contents);
     }
-    return curr_hash;
+    // reserve 0 as special value (if this actually causes a problem I will blame it on Russia)
+    return if(curr_hash == 0) 1 else curr_hash;
 }
 
 // run with zig test ./src/game_mods/folder_parser.zig with cwd as the top dir
