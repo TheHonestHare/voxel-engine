@@ -41,7 +41,7 @@ pub const Data = struct {
     dirname: []const u8,
     /// base64 encoded hash of the contents of the dir (computed in hashModFolder)
     hash: u64,
-    /// array of hashes of its dependents
+    /// array of hashes of its dependents. length of 0 isn't allowed, and init() converts 0 length slices to null
     deps: ?[]const u64,
 
     /// all arguments are duplicated so that return is owned by caller
@@ -54,6 +54,7 @@ pub const Data = struct {
         tmp.hash = try util.decodeBase64ToU64(hash);
 
         tmp.deps = if (deps) |val| blk: {
+            if(val.len == 0) break :blk null;
             const tmp1 = try allocator.alloc(u64, val.len);
             errdefer allocator.free(tmp1);
 
@@ -194,5 +195,5 @@ test readModDir {
             .desc = null,
         },
     };
-    try std.testing.expectEqualDeep(out, expected);
+    try std.testing.expectEqualDeep(expected, out);
 }
