@@ -9,10 +9,11 @@ pub const ModDAG = struct {
     /// connection value of 2^16 - 2 means no connections
     connections: [*]u16,
 
-    /// returns null if root node, else slice into connections
+    /// returns null if root node, else slice into connections that are nonempty
     pub fn getModDeps(self: ModDAG, i: u16) ?[]const u16 {
         if (i == 0) return null;
-        return self.connections[tri_num(i)..tri_num(i + 1)];
+        const empty_start = std.mem.indexOfScalar(u16, self.hashes[tri_num(i)..tri_num(i+1)], std.math.maxInt(u16));
+        return self.connections[tri_num(i) + empty_start..tri_num(i + 1)];
     }
     pub fn getHashIndex(self: @This(), hash: u64) ?u16 {
         return @intCast(std.mem.indexOfScalar(u64, self.hashes[0..self.len], hash));
