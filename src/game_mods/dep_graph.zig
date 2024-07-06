@@ -15,7 +15,7 @@ pub const ModDAG = struct {
         const offset = tri_num(i);
         const next_offset = tri_num(i + 1);
         const empty_start = std.mem.indexOfScalar(u16, self.hashes[offset..next_offset], std.math.maxInt(u16)) orelse next_offset;
-        return self.connections[offset..empty_start];
+        return if(empty_start == 0) null else self.connections[offset..empty_start];
     }
     pub fn getHashIndex(self: @This(), hash: u64) ?u16 {
         return @intCast(std.mem.indexOfScalar(u64, self.hashes[0..self.len], hash));
