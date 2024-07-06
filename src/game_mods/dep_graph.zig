@@ -12,8 +12,10 @@ pub const ModDAG = struct {
     /// returns null if root node, else slice into connections that are nonempty
     pub fn getModDeps(self: ModDAG, i: u16) ?[]const u16 {
         if (i == 0) return null;
-        const empty_start = std.mem.indexOfScalar(u16, self.hashes[tri_num(i)..tri_num(i+1)], std.math.maxInt(u16));
-        return self.connections[tri_num(i) + empty_start..tri_num(i + 1)];
+        const offset = tri_num(i);
+        const next_offset = tri_num(i + 1);
+        const empty_start = std.mem.indexOfScalar(u16, self.hashes[offset..next_offset], std.math.maxInt(u16)) orelse next_offset;
+        return self.connections[offset..empty_start];
     }
     pub fn getHashIndex(self: @This(), hash: u64) ?u16 {
         return @intCast(std.mem.indexOfScalar(u64, self.hashes[0..self.len], hash));
@@ -102,6 +104,9 @@ pub const ModDAG = struct {
 };
 
 /// returns the nth triangular number (n=1 -> 0), with no regard for big numbers :)
+/// don't plug in 0,
+/// 1 2 3 4  5  6  7
+/// 0 1 3 6 10 15 21
 fn tri_num(n: u16) u32 {
     return (n - 1) * n / 2;
 }
