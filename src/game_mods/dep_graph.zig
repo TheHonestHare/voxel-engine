@@ -110,6 +110,11 @@ pub const ModDAG = struct {
         }
         return tmp;
     }
+
+    pub fn deinit(self: @This(), ally: std.mem.Allocator) void {
+        ally.free(self.hashes[0..self.len]);
+        ally.free(self.connections[0..tri_num(self.len)]);
+    }
 };
 
 /// returns the nth triangular number (n=1 -> 0), with no regard for big numbers :)
@@ -186,8 +191,9 @@ test "error.InvalidDepHash" {
         Data{ .hash = 29292929, .deps = &.{ 34983498431, 1287278 }, .dirname = "" },
     };
     try std.testing.expectError(error.InvalidDepHash, ModDAG.create(ally, ally, &data));
-    @constCast(data[3].deps.?)[1] = 1;
+    @constCast(data[3].deps.?)[1] = 1; // fix the invalid hash
     const realDAG = try ModDAG.create(ally, ally, &data);
+    defer realDAG.deinit(ally);
     try std.testing.expect(testAllConnections(realDAG, &data));
 }
 
