@@ -5,7 +5,7 @@ const Data = @import("folder_parser.zig").Data;
 pub const ModDAG = struct {
     len: u16,
     hashes: [*]u64,
-    /// deps has max size of tri_num(hashes.len-1)
+    /// length is tri_num(len)
     /// connection value of 2^16 - 2 means no connections
     connections: [*]u16,
 
@@ -14,13 +14,14 @@ pub const ModDAG = struct {
         if (i == 0) return null;
         const offset = tri_num(i);
         const next_offset = tri_num(i + 1);
-        const empty_start = std.mem.indexOfScalar(u16, self.hashes[offset..next_offset], std.math.maxInt(u16)) orelse next_offset;
-        return if(empty_start == 0) null else self.connections[offset..empty_start];
+        const empty_start = std.mem.indexOfScalar(u16, self.connections[offset..next_offset], std.math.maxInt(u16)) orelse next_offset;
+        return if (empty_start == 0) null else self.connections[offset..next_offset][0..empty_start];
     }
     pub fn getHashIndex(self: @This(), hash: u64) ?u16 {
-        return @intCast(std.mem.indexOfScalar(u64, self.hashes[0..self.len], hash));
+        return @intCast(std.mem.indexOfScalar(u64, self.hashes[0..self.len], hash) orelse return null);
     }
     // TODO: should runtime adding and removing mods be allowed?
+    // TODO: check for hash being 0
     /// mods in earlier indexes will be applied first
     /// asserts a max of 2^16-1-1 mods but I don't think anything in this engine will reach that
     /// 2^16-1 in connections is reserved for empty element
@@ -57,7 +58,11 @@ pub const ModDAG = struct {
                     continue;
                 }
                 tmp.hashes[hash_i] = mods[unused.items[i]].hash;
-                if (hash_to_i.getOrPutAssumeCapacity(tmp.hashes[hash_i]).found_existing) return error.DuplicateEntry;
+                {
+                    const res = hash_to_i.getOrPutAssumeCapacity(tmp.hashes[hash_i]);
+                    if(res.found_existing) return error.DuplicateEntry;
+                    res.value_ptr.* = hash_i;
+                }
                 if (hash_i != 0) @memset(tmp.connections[tri_num(hash_i)..tri_num(hash_i + 1)], std.math.maxInt(u16));
                 _ = unused.swapRemove(i);
                 hash_i += 1;
@@ -83,10 +88,14 @@ pub const ModDAG = struct {
                     };
                 }
                 @memcpy(tmp.connections[tri_num(hash_i)..], hash_dep_buff[0..curr_mod.deps.?.len]);
-                @memset(tmp.connections[curr_mod.deps.?.len..tri_num(hash_i + 1)], std.math.maxInt(u16));
+                @memset(tmp.connections[tri_num(hash_i) + curr_mod.deps.?.len..tri_num(hash_i + 1)], std.math.maxInt(u16)); //not right
 
                 tmp.hashes[hash_i] = curr_mod.hash;
-                if (hash_to_i.getOrPutAssumeCapacity(tmp.hashes[hash_i]).found_existing) return error.DuplicateEntry;
+                {
+                    const res = hash_to_i.getOrPutAssumeCapacity(tmp.hashes[hash_i]);
+                    if(res.found_existing) return error.DuplicateEntry;
+                    res.value_ptr.* = hash_i;
+                }
                 _ = unused.swapRemove(i);
                 hash_i += 1;
             }
@@ -105,8 +114,10 @@ pub const ModDAG = struct {
 
 /// returns the nth triangular number (n=1 -> 0), with no regard for big numbers :)
 /// don't plug in 0,
-/// 1 2 3 4  5  6  7
-/// 0 1 3 6 10 15 21
+/// ```
+/// 1 2 3 4  5  6  7 ...
+/// 0 1 3 6 10 15 21 ...
+/// ```
 fn tri_num(n: u16) u32 {
     return (n - 1) * n / 2;
 }
@@ -120,6 +131,13 @@ test "error.CircularDependency" {
     };
     const ally = std.testing.allocator;
     try std.testing.expectError(error.CircularDependency, ModDAG.create(ally, ally, &data));
+    const data_2 = [_]Data{
+        Data{ .hash = 1010, .deps = null, .dirname = "" },
+        Data{ .hash = 82911919, .deps = &.{4893849834}, .dirname = "" },
+        Data{ .hash = 8, .deps = &.{ 1010, 8 }, .dirname = "" },
+        Data{ .hash = 4893849834, .deps = &.{ 1010, 8 }, .dirname = "" },
+    };
+    try std.testing.expectError(error.CircularDependency, ModDAG.create(ally, ally, &data_2));
 }
 
 test "error.NoMods" {
@@ -150,8 +168,54 @@ test "error.DuplicateEntry" {
         Data{ .hash = 388949854, .deps = &.{111122223}, .dirname = "" },
         Data{ .hash = 111122223, .deps = null, .dirname = "" },
         Data{ .hash = 769201948, .deps = &.{388949854}, .dirname = "" },
-        Data{ .hash = 769201948, .deps = &.{388949854}, .dirname = "" },
+        Data{ .hash = 769201948, .deps = &.{111122223}, .dirname = "" },
     };
     const ally = std.testing.allocator;
     try std.testing.expectError(error.DuplicateEntry, ModDAG.create(ally, ally, &data));
+}
+
+test "error.InvalidDepHash" {
+    const ally = std.testing.allocator;
+    var problematic = [_]u64{2398329823988, 2};
+    var data = [_]Data{
+        Data{ .hash = 34983498431, .deps = &.{2398329823988}, .dirname = "" },
+        Data{ .hash = 12345678901, .deps = &.{34983498431}, .dirname = "" },
+        Data{ .hash = 2398329823988, .deps = null, .dirname = "" },
+        Data{ .hash = 1287278, .deps = &problematic, .dirname = "" }, // notice its 2 not 1
+        Data{ .hash = 1, .deps = null, .dirname = "" },
+        Data{ .hash = 29292929, .deps = &.{ 34983498431, 1287278 }, .dirname = "" },
+    };
+    try std.testing.expectError(error.InvalidDepHash, ModDAG.create(ally, ally, &data));
+    @constCast(data[3].deps.?)[1] = 1;
+    const realDAG = try ModDAG.create(ally, ally, &data);
+    try std.testing.expect(testAllConnections(realDAG, &data));
+}
+
+fn testAllConnections(dag: ModDAG, orig: []const Data) bool {
+    for (orig) |entry| {
+        if (entry.deps) |deps| 
+            if(!hasSameConnections(deps, dag.getModDeps(dag.getHashIndex(entry.hash) orelse return false) orelse  return false, dag.hashes[0..dag.len]))
+                return false
+            else continue; 
+        if(dag.getModDeps(dag.getHashIndex(entry.hash) orelse return false) != null) 
+            return false
+        else continue;
+    }
+    return true;
+}
+/// this has bad allocation practices but I don't care bc its a test
+fn hasSameConnections(data_connections_: []const u64, dag_connections_: []const u16, dag_hashes: []const u64) bool {
+    const ally = std.testing.allocator;
+    const data_connections = ally.dupe(u64, data_connections_) catch @panic("OOM");
+    defer ally.free(data_connections);
+    const dag_connections = ally.dupe(u16, dag_connections_) catch @panic("OOM");
+    defer ally.free(dag_connections);
+    std.mem.sort(u64, data_connections, {}, std.sort.asc(u64));
+    std.mem.sort(u16, dag_connections, dag_hashes, hashesAreLessThan);
+    for(dag_connections, data_connections) |dag, data| if(data != dag_hashes[dag]) return false;
+    return true;
+}
+
+fn hashesAreLessThan(hashes: []const u64, lhs: u16, rhs: u16) bool {
+    return hashes[lhs] < hashes[rhs];
 }
