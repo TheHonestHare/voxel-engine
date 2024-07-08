@@ -10,11 +10,11 @@ pub const ModDAG = struct {
     connections: [*]u16,
 
     /// returns null if root node, else slice into connections that are nonempty
-    pub fn getModDeps(self: ModDAG, i: u16) ?[]const u16 {
+    pub fn getModDeps(self: @This(), i: u16) ?[]const u16 {
         if (i == 0) return null;
         const offset = tri_num(i);
         const next_offset = tri_num(i + 1);
-        const empty_start = std.mem.indexOfScalar(u16, self.connections[offset..next_offset], std.math.maxInt(u16)) orelse next_offset;
+        const empty_start = std.mem.indexOfScalar(u16, self.connections[offset..next_offset], std.math.maxInt(u16)) orelse next_offset - offset;
         return if (empty_start == 0) null else self.connections[offset..next_offset][0..empty_start];
     }
     pub fn getHashIndex(self: @This(), hash: u64) ?u16 {
@@ -60,7 +60,7 @@ pub const ModDAG = struct {
                 tmp.hashes[hash_i] = mods[unused.items[i]].hash;
                 {
                     const res = hash_to_i.getOrPutAssumeCapacity(tmp.hashes[hash_i]);
-                    if(res.found_existing) return error.DuplicateEntry;
+                    if (res.found_existing) return error.DuplicateEntry;
                     res.value_ptr.* = hash_i;
                 }
                 if (hash_i != 0) @memset(tmp.connections[tri_num(hash_i)..tri_num(hash_i + 1)], std.math.maxInt(u16));
@@ -88,12 +88,12 @@ pub const ModDAG = struct {
                     };
                 }
                 @memcpy(tmp.connections[tri_num(hash_i)..], hash_dep_buff[0..curr_mod.deps.?.len]);
-                @memset(tmp.connections[tri_num(hash_i) + curr_mod.deps.?.len..tri_num(hash_i + 1)], std.math.maxInt(u16)); //not right
+                @memset(tmp.connections[tri_num(hash_i) + curr_mod.deps.?.len .. tri_num(hash_i + 1)], std.math.maxInt(u16)); //not right
 
                 tmp.hashes[hash_i] = curr_mod.hash;
                 {
                     const res = hash_to_i.getOrPutAssumeCapacity(tmp.hashes[hash_i]);
-                    if(res.found_existing) return error.DuplicateEntry;
+                    if (res.found_existing) return error.DuplicateEntry;
                     res.value_ptr.* = hash_i;
                 }
                 _ = unused.swapRemove(i);
@@ -127,22 +127,40 @@ fn tri_num(n: u16) u32 {
     return (n - 1) * n / 2;
 }
 
-test "error.CircularDependency" {
-    const data = [_]Data{
+test "CircularDependency error" {
+    const ally = std.testing.allocator;
+
+    var data = [_]Data{
         Data{ .hash = 1010, .deps = null, .dirname = "" },
-        Data{ .hash = 82911919, .deps = &.{4893849834}, .dirname = "" },
+        Data{ .hash = 82911919, .deps = &.{4893849834}, .dirname = "" }, // problematic
         Data{ .hash = 8, .deps = &.{ 1010, 82911919 }, .dirname = "" },
         Data{ .hash = 4893849834, .deps = &.{ 1010, 8 }, .dirname = "" },
     };
-    const ally = std.testing.allocator;
     try std.testing.expectError(error.CircularDependency, ModDAG.create(ally, ally, &data));
-    const data_2 = [_]Data{
+
+    data[1].deps = null;
+    const dag = try ModDAG.create(ally, ally, &data);
+    defer dag.deinit(ally);
+    try std.testing.expect(testAllConnections(dag, &data));
+}
+
+test "Single entry CircularDependency error" {
+    const ally = std.testing.allocator;
+
+    const problematic = [_]u64{ 1010, 8 };
+    var data = [_]Data{
         Data{ .hash = 1010, .deps = null, .dirname = "" },
         Data{ .hash = 82911919, .deps = &.{4893849834}, .dirname = "" },
-        Data{ .hash = 8, .deps = &.{ 1010, 8 }, .dirname = "" },
+        Data{ .hash = 8, .deps = problematic[0..2], .dirname = "" },
         Data{ .hash = 4893849834, .deps = &.{ 1010, 8 }, .dirname = "" },
     };
-    try std.testing.expectError(error.CircularDependency, ModDAG.create(ally, ally, &data_2));
+    try std.testing.expectError(error.CircularDependency, ModDAG.create(ally, ally, &data));
+
+    data[2].deps = problematic[0..1];
+    const dag = try ModDAG.create(ally, ally, &data);
+    std.log.warn("help me please {any}", .{dag});
+    defer dag.deinit(ally);
+    try std.testing.expect(testAllConnections(dag, &data));
 }
 
 test "error.NoMods" {
@@ -181,17 +199,17 @@ test "error.DuplicateEntry" {
 
 test "error.InvalidDepHash" {
     const ally = std.testing.allocator;
-    var problematic = [_]u64{2398329823988, 2};
+
     var data = [_]Data{
         Data{ .hash = 34983498431, .deps = &.{2398329823988}, .dirname = "" },
         Data{ .hash = 12345678901, .deps = &.{34983498431}, .dirname = "" },
         Data{ .hash = 2398329823988, .deps = null, .dirname = "" },
-        Data{ .hash = 1287278, .deps = &problematic, .dirname = "" }, // notice its 2 not 1
+        Data{ .hash = 1287278, .deps = &.{ 2398329823988, 2 }, .dirname = "" }, // notice its 2 not 1
         Data{ .hash = 1, .deps = null, .dirname = "" },
         Data{ .hash = 29292929, .deps = &.{ 34983498431, 1287278 }, .dirname = "" },
     };
     try std.testing.expectError(error.InvalidDepHash, ModDAG.create(ally, ally, &data));
-    @constCast(data[3].deps.?)[1] = 1; // fix the invalid hash
+    data[3].deps = &.{ 2398329823988, 1 }; // fix the invalid hash
     const realDAG = try ModDAG.create(ally, ally, &data);
     defer realDAG.deinit(ally);
     try std.testing.expect(testAllConnections(realDAG, &data));
@@ -199,13 +217,15 @@ test "error.InvalidDepHash" {
 
 fn testAllConnections(dag: ModDAG, orig: []const Data) bool {
     for (orig) |entry| {
-        if (entry.deps) |deps| 
-            if(!hasSameConnections(deps, dag.getModDeps(dag.getHashIndex(entry.hash) orelse return false) orelse  return false, dag.hashes[0..dag.len]))
+        if (entry.deps) |deps|
+            if (!hasSameConnections(deps, dag.getModDeps(dag.getHashIndex(entry.hash) orelse return false) orelse return false, dag.hashes[0..dag.len]))
                 return false
-            else continue; 
-        if(dag.getModDeps(dag.getHashIndex(entry.hash) orelse return false) != null) 
+            else
+                continue;
+        if (dag.getModDeps(dag.getHashIndex(entry.hash) orelse return false) != null)
             return false
-        else continue;
+        else
+            continue;
     }
     return true;
 }
@@ -218,7 +238,7 @@ fn hasSameConnections(data_connections_: []const u64, dag_connections_: []const 
     defer ally.free(dag_connections);
     std.mem.sort(u64, data_connections, {}, std.sort.asc(u64));
     std.mem.sort(u16, dag_connections, dag_hashes, hashesAreLessThan);
-    for(dag_connections, data_connections) |dag, data| if(data != dag_hashes[dag]) return false;
+    for (dag_connections, data_connections) |dag, data| if (data != dag_hashes[dag]) return false;
     return true;
 }
 
