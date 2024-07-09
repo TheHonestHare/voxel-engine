@@ -1,6 +1,6 @@
 const std = @import("std");
 const util = @import("util.zig");
-const Data = @import("folder_parser.zig").Data;
+const Data = @import("mod_folder_parser.zig").Data;
 
 pub const ModDAG = struct {
     len: u16,
