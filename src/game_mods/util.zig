@@ -36,7 +36,7 @@ pub fn decodeBase64ToU64(str: HashBase64) !u64 {
 /// returns if the base64 hash provided will actually fit into a u64
 /// TODO: make sure I'm not just lying about that
 pub fn isValidBase64Hash(str: []const u8) bool {
-    if(str.len != base64_of_u64_size) return false;
+    if (str.len != base64_of_u64_size) return false;
     return str[base64_of_u64_size - 1] & 0x03 == 0;
 }
 
@@ -47,9 +47,9 @@ test "base64 test" {
 }
 
 test decodeBase64ToU64 {
-    try std.testing.expect(!isValidBase64Hash(""));            // wrong length so won't even compile when inputted
+    try std.testing.expect(!isValidBase64Hash("")); // wrong length so won't even compile when inputted
     try std.testing.expect(!isValidBase64Hash("99999999999")); // last 2 bits are 01
-    try std.testing.expect(isValidBase64Hash("99999999998"));  // last 2 bits are 00
+    try std.testing.expect(isValidBase64Hash("99999999998")); // last 2 bits are 00
 
     try std.testing.expectError(error.InvalidPadding, decodeBase64ToU64("99999999999".*));
     try std.testing.expectEqual(std.mem.bigToNative(u64, 0b11110111_11011111_01111101_11110111_11011111_01111101_11110111_11011111), decodeBase64ToU64("99999999998".*));

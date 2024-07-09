@@ -54,7 +54,7 @@ pub const Data = struct {
         tmp.hash = try util.decodeBase64ToU64(hash);
 
         tmp.deps = if (deps) |val| blk: {
-            if(val.len == 0) break :blk null;
+            if (val.len == 0) break :blk null;
             const tmp1 = try allocator.alloc(u64, val.len);
             errdefer allocator.free(tmp1);
 
@@ -171,7 +171,7 @@ pub fn hashModFolder(allocator: std.mem.Allocator, dir: std.fs.Dir) !u64 {
         curr_hash ^= std.hash.CityHash64.hash(contents);
     }
     // reserve 0 as special value (if this actually causes a problem I will blame it on Russia)
-    return if(curr_hash == 0) 1 else curr_hash;
+    return if (curr_hash == 0) 1 else curr_hash;
 }
 
 // run with zig test ./src/game_mods/folder_parser.zig with cwd as the top dir
