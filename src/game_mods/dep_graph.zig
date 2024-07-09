@@ -158,7 +158,6 @@ test "Single entry CircularDependency error" {
 
     data[2].deps = problematic[0..1];
     const dag = try ModDAG.create(ally, ally, &data);
-    std.log.warn("help me please {any}", .{dag});
     defer dag.deinit(ally);
     try std.testing.expect(testAllConnections(dag, &data));
 }
