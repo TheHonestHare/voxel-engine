@@ -12,6 +12,11 @@
             .url = "https://github.com/malcolmstill/zware/archive/refs/heads/master.tar.gz",
             .hash = "1220111dbf520f29c3fd7f96853fa20ce43e46c2c73e021bcbb3ea5fb931c84034be",
         },
+        // first added on b5a4073
+        .zig_aio = .{
+            .url = "https://github.com/Cloudef/zig-aio/archive/refs/heads/master.tar.gz",
+            .hash = "1220a55aedabdd10578d0c514719ea39ae1bc6d7ed990f508dc100db7f0ccf391437",
+        },
     },
 
     .paths = .{

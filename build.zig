@@ -36,6 +36,10 @@ pub fn build(b: *std.Build) !void {
         const zware_dep = b.dependency("zware", .{.target = target, .optimize = optimize});
         exe.root_module.addImport("zware", zware_dep.module("zware"));
     } else return error.WasmNotSupportedYet;
+
+    const aio_dep = b.dependency("zig_aio", .{.target = target, .optimize = optimize});
+    exe.root_module.addImport("aio", aio_dep.module("aio"));
+    exe.root_module.addImport("coro", aio_dep.module("coro"));
     
 
     if (!dev) {
