@@ -4,6 +4,7 @@ const Data = @import("mod_folder_parser.zig").Data;
 
 pub const ModDAG = struct {
     len: u16,
+    /// when iterated in order, dependencies will always be satisfied
     hashes: [*]u64,
     /// length is tri_num(len)
     /// connection value of 2^16 - 2 means no connections
