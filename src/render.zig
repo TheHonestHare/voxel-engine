@@ -37,13 +37,14 @@ pub fn init() !void {
     core.setCursorMode(.disabled);
 
     create_raytrace_pipeline("./shaders/raytrace.wgsl", camera_bindgroup_layout) catch
-        if (config.validate) {
-            core.setCursorMode(.normal);
-            create_raytrace_pipeline("./shaders/fallback_raytrace.wgsl", camera_bindgroup_layout) catch {
-                log.err("failed to initialise fallback", .{});
-                std.debug.panic("fallback failed to compile", .{});
-            };
-        } else unreachable;
+        if (config.validate)
+    {
+        core.setCursorMode(.normal);
+        create_raytrace_pipeline("./shaders/fallback_raytrace.wgsl", camera_bindgroup_layout) catch {
+            log.err("failed to initialise fallback", .{});
+            std.debug.panic("fallback failed to compile", .{});
+        };
+    } else unreachable;
 
     // TODO: this should be under config.validate
     create_render_pipeline() catch {

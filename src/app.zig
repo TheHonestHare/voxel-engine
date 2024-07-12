@@ -1,5 +1,7 @@
 const std = @import("std");
 const mach = @import("mach");
+const aio = @import("aio");
+const coro = @import("coro");
 const config = @import("config");
 const events = @import("./event.zig");
 const render = @import("./render.zig");
@@ -20,6 +22,9 @@ const initial_title = "voxel renderer";
 pub const std_options: std.Options = .{ .log_scope_levels = &[_]std.log.ScopeLevel{
     .{ .scope = .mach, .level = .debug },
 } };
+
+pub const aio_options: aio.Options = .{};
+pub const coro_options: coro.Options = .{};
 
 title_timer: if (config.dev) mach.Timer else void,
 timer: mach.Timer,

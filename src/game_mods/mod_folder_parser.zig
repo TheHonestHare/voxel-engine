@@ -71,39 +71,26 @@ pub const Data = struct {
     }
 };
 // TODO: fuzz test implementation for errors and leaks
+// TODO: make the fields inline for use with MultiArrayList, don't create mods all at once. integrate with zig-aio
 pub const Mod = struct {
     // TODO: should these really be const??
-    data: *const Data,
-    meta: *const MetaData,
+    data: Data,
+    meta: MetaData,
 
     /// Remember to call deinit
     pub fn init(allocator: std.mem.Allocator, modmeta: MetaJSONFormat_0, mod: []const u8) !@This() {
         var tmp: @This() = undefined;
-        tmp.data = blk: {
-            const tmp1 = try allocator.create(Data);
-            errdefer allocator.destroy(tmp1);
-            tmp1.* = try Data.init(allocator, mod, modmeta.hash, modmeta.deps);
-            break :blk tmp1;
-        };
-        errdefer allocator.destroy(tmp.data);
+        tmp.data = try Data.init(allocator, mod, modmeta.hash, modmeta.deps);
         errdefer tmp.data.deinit(allocator);
 
-        tmp.meta = blk: {
-            const tmp1 = try allocator.create(MetaData);
-            errdefer allocator.destroy(tmp1);
-            tmp1.* = try MetaData.init(allocator, modmeta.name, modmeta.modversion, modmeta.author, modmeta.desc);
-            break :blk tmp1;
-        };
-        errdefer allocator.destroy(tmp.meta);
+        tmp.meta = try MetaData.init(allocator, modmeta.name, modmeta.modversion, modmeta.author, modmeta.desc);
         errdefer tmp.meta.deinit(allocator);
         return tmp;
     }
 
     pub fn deinit(self: @This(), allocator: std.mem.Allocator) void {
         self.data.deinit(allocator);
-        allocator.destroy(self.data);
         self.meta.deinit(allocator);
-        allocator.destroy(self.meta);
     }
 };
 
@@ -183,12 +170,12 @@ test readModDir {
     const out = try readModDir(std.testing.allocator, example_mod_dir, "example_mod");
     defer out.deinit(std.testing.allocator);
     const expected: Mod = .{
-        .data = &.{
+        .data = .{
             .dirname = "example_mod",
             .hash = 679187453357837628,
             .deps = null,
         },
-        .meta = &.{
+        .meta = .{
             .modname = null,
             .modversion = null,
             .author = null,
