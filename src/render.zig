@@ -36,11 +36,11 @@ pub fn init() !void {
     defer camera_bindgroup_layout.release();
     core.setCursorMode(.disabled);
 
-    create_raytrace_pipeline("./shaders/raytrace.wgsl", camera_bindgroup_layout) catch
+    create_raytrace_pipeline("./assets/shaders/raytrace.wgsl", camera_bindgroup_layout) catch
         if (config.validate)
     {
         core.setCursorMode(.normal);
-        create_raytrace_pipeline("./shaders/fallback_raytrace.wgsl", camera_bindgroup_layout) catch {
+        create_raytrace_pipeline("./assets/shaders/fallback_raytrace.wgsl", camera_bindgroup_layout) catch {
             log.err("failed to initialise fallback", .{});
             std.debug.panic("fallback failed to compile", .{});
         };
@@ -66,8 +66,8 @@ fn create_bindgroups() !*gpu.BindGroupLayout {
 
 fn create_raytrace_pipeline(comptime path: [:0]const u8, camera_bindgroup_layout: *gpu.BindGroupLayout) !void {
     var compute_module = blk: {
-        const shaderbuff = try get_shader_source(core.allocator, path);
-        defer free_shader_source(core.allocator, shaderbuff);
+        const shaderbuff = try get_engine_shader_source(core.allocator, path);
+        defer free_engine_shader_source(core.allocator, shaderbuff);
         if (config.validate) core.device.pushErrorScope(gpu.ErrorFilter.validation);
         const temp = core.device.createShaderModuleWGSL(if (config.validate) "screen compute shader" else null, shaderbuff);
         errdefer temp.release();
@@ -113,8 +113,8 @@ fn create_raytrace_pipeline(comptime path: [:0]const u8, camera_bindgroup_layout
 
 fn create_render_pipeline() !void {
     var shader_module = blk: {
-        const shaderbuff = try get_shader_source(core.allocator, "./shaders/render.wgsl");
-        defer free_shader_source(core.allocator, shaderbuff);
+        const shaderbuff = try get_engine_shader_source(core.allocator, "./assets/shaders/render.wgsl");
+        defer free_engine_shader_source(core.allocator, shaderbuff);
         if (config.validate) core.device.pushErrorScope(gpu.ErrorFilter.validation);
         const temp = core.device.createShaderModuleWGSL(if (config.validate) "rendering shader" else null, shaderbuff);
         errdefer temp.release();
@@ -290,14 +290,22 @@ inline fn error_callback(valid: *bool, error_type: gpu.ErrorType, message: [*:0]
         valid.* = false;
     }
 }
-fn get_shader_source(allocator: std.mem.Allocator, comptime path: [:0]const u8) ![:0]const u8 {
-    if (config.dev) {
-        return (try std.fs.cwd().readFileAllocOptions(allocator, path, std.math.maxInt(usize), null, 1, 0))[0.. :0];
+// FIXME: using this function would prevent a mod from taking over the base engine rendering shader (is that important?)
+// FIXME: this shouldn't take an allocator: we should dedicate a function to just creating a shader module
+fn get_engine_shader_source(allocator: std.mem.Allocator, comptime path: [:0]const u8) ![:0]const u8 {
+    if (config.engine_dev) {
+        // TODO: don't abuse try handle the error here. Also use selfExeDirPath not alloc
+        var buff: [std.fs.max_path_bytes]u8 = undefined;
+        const self_exe_dir_path = try std.fs.selfExeDirPath(&buff);
+        const src_dir_path = try std.fs.path.join(allocator, &.{self_exe_dir_path, config.src_folder orelse @compileError("TODO: give a reasonable default for src_folder or just don't do shader hot reloading")});
+        defer allocator.free(src_dir_path);
+        const src_dir = std.fs.openDirAbsolute(src_dir_path, .{}) catch |e| std.debug.panic("failed to open src dir for shader hot reloading: {}", .{e});
+        return (try src_dir.readFileAllocOptions(allocator, path, std.math.maxInt(usize), null, 1, 0))[0.. :0];
     } else {
         return @embedFile("./assets/" ++ path);
     }
 }
 
-fn free_shader_source(allocator: std.mem.Allocator, buff: [:0]const u8) void {
-    if (config.dev) allocator.free(buff);
+fn free_engine_shader_source(allocator: std.mem.Allocator, buff: [:0]const u8) void {
+    if (config.engine_dev) allocator.free(buff);
 }

@@ -6,6 +6,8 @@ const JobRunner = @import("JobRunner.zig");
 // TODO: remove this functionality from entrypoint, place it in here
 const wasm_spawner = @import("game_mods/wasm_loader.zig");
 
+const save = @import("save_resolver.zig");
+
 pub usingnamespace @import("./app.zig");
 const config = @import("config");
 const App = @import("./app.zig");
@@ -21,14 +23,12 @@ pub const modules = .{
 pub fn main() !void {
     // TODO: release should use c allocator
     var GPA = std.heap.GeneralPurposeAllocator(.{}){};
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer _ = GPA.deinit();
     const ally = GPA.allocator();
-    const scratch = GPA.allocator();
+    const scratch = arena.allocator();
     mach.core.allocator = ally;
-    const path = std.fs.selfExeDirPathAlloc(ally) catch ".";
-    const assets_path = if (config.dev) try std.mem.concat(ally, u8, &.{ path, config.assets_dir }) else ".";
-    std.log.debug("{s}", .{assets_path});
-    try std.process.changeCurDir(assets_path);
+    save.changeCWDToSave(ally); // args specified in build options
 
     var jobs: JobRunner = undefined;
     try jobs.init(ally);
@@ -36,7 +36,7 @@ pub fn main() !void {
 
     // TODO: move mods_getter.zig logic here so we don't keep reopening stuff
     {
-        var all_mods_dir = try std.fs.cwd().openDir("mods", .{ .iterate = true });
+        var all_mods_dir = try std.fs.cwd().openDir("all_available_mods", .{ .iterate = true });
         defer all_mods_dir.close();
         const dataslice, const metaslice, const dag = try @import("game_mods/mods_getter.zig").parseAllModsDir(ally, scratch, all_mods_dir);
         defer {
@@ -74,10 +74,6 @@ pub fn main() !void {
         try jobs.scheduler.run(.wait);
         // TODO: error handle for each
     }
-
-    ally.free(path);
-    if (config.dev) mach.core.allocator.free(assets_path);
-
     try mach.core.initModule();
     while (mach.core.tick() catch unreachable) {}
 }

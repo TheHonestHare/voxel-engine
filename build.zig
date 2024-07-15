@@ -8,12 +8,22 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const dev = !(b.option(bool, "no_dev", "disables development features") orelse false);
     const options = b.addOptions();
+
+    const dev = !(b.option(bool, "no_dev", "disables development features useful for mod devs") orelse false);
     options.addOption(bool, "dev", dev);
 
-    const assets_dir = b.option([]const u8, "assets_dir", "path to assets folder") orelse "\\..\\..\\src\\assets";
-    options.addOption([]const u8, "assets_dir", assets_dir);
+    const engine_dev = (b.option(bool, "engine_dev", "enabled debugging features that literally only I (the writer of the engine) care about") orelse false);
+    options.addOption(bool, "engine_dev", engine_dev);
+    // TODO: option for removing hash validation
+    const src_folder = b.option([]const u8, "src_folder", "path to src folder relative to the executable location. Used for shader hot reloading");
+    options.addOption(?[]const u8, "src_folder", src_folder);
+
+    const save_folder = b.option([]const u8, "save_folder", "path to a custom development save folder from executable location. Must follow the same save structure as usual");
+    options.addOption(?[]const u8, "save_folder", save_folder);
+    
+    const game_dir = b.option([]const u8, "game_dir_name", "The directory name to use for save folder under std.fs.getAppDataDir");
+    options.addOption(?[]const u8, "game_dir_name", game_dir);
 
     const validation = !(b.option(bool, "no_validation", "disables validation checking") orelse false);
     options.addOption(bool, "validate", validation);

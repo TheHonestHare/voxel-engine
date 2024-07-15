@@ -142,6 +142,7 @@ fn parseModMetaValue(allocator: std.mem.Allocator, src: *std.json.Value) !std.js
 }
 
 pub const skip_hash_files = .{ "modmeta.json", "thumb.bmp" };
+// TODO: only hash "main.wasm" so stuff like shader hot reloading can work (maybe make full hash optional?)
 /// Computes the hash of a directory, ignoring files in skip_hash_files
 /// Doesn't check for file names / other metadata, only the contents
 /// Will not return 0 as a value, so collections can use 0 as an empty element
@@ -164,8 +165,7 @@ pub fn hashModFolder(allocator: std.mem.Allocator, dir: std.fs.Dir) !u64 {
 // run with zig test ./src/game_mods/folder_parser.zig with cwd as the top dir
 // TODO: integrate with zig build test or smth
 test readModDir {
-    // TODO: maybe generate the test folder dynamically / this seems ugly / don't rely on cwd
-    var example_mod_dir = try std.fs.cwd().openDir("./src/testing/example_all_mods", .{});
+    var example_mod_dir = try std.fs.cwd().openDir("example_save_dir/all_available_mods", .{});
     defer example_mod_dir.close();
     const out = try readModDir(std.testing.allocator, example_mod_dir, "example_mod");
     defer out.deinit(std.testing.allocator);
