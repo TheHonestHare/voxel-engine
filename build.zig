@@ -21,7 +21,7 @@ pub fn build(b: *std.Build) !void {
 
     const save_folder = b.option([]const u8, "save_folder", "path to a custom development save folder from executable location. Must follow the same save structure as usual");
     options.addOption(?[]const u8, "save_folder", save_folder);
-    
+
     const game_dir = b.option([]const u8, "game_dir_name", "The directory name to use for save folder under std.fs.getAppDataDir");
     options.addOption(?[]const u8, "game_dir_name", game_dir);
 
