@@ -3,6 +3,7 @@ const mach = @import("mach");
 const aio = @import("aio");
 const coro = @import("coro");
 const JobRunner = @import("JobRunner.zig");
+const tracer = @import("tracer");
 // TODO: remove this functionality from entrypoint, place it in here
 const wasm_spawner = @import("game_mods/wasm_loader.zig");
 
@@ -16,6 +17,8 @@ pub const modules = .{
     mach.Core,
     @import("./app.zig"),
 };
+
+pub const tracer_impl = tracer.none;
 
 // TODO: figure out what to do with assets directory with !config.dev
 // TODO: instead of failing, create an init fail function
