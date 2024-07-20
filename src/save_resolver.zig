@@ -11,13 +11,37 @@ pub fn changeCWDToSave(allocator: std.mem.Allocator) void {
         defer allocator.free(abs_dirname);
         std.process.changeCurDir(abs_dirname) catch |e| changeDirErrorPanic(e);
     } else if (config.game_dir_name) |dirname| {
-        const save_dir = std.fs.getAppDataDir(allocator, dirname) catch |e| switch (e) {
+        const save_dir_path = std.fs.getAppDataDir(allocator, dirname) catch |e| switch (e) {
             error.OutOfMemory => std.debug.panic("Got OOM how did this even happen this allocator shouldn't even be here", .{}),
             error.AppDataDirUnavailable => std.debug.panic("Appdata directory not found for some reason", .{}),
         };
-        defer allocator.free(save_dir);
-        std.process.changeCurDir(save_dir) catch |e| changeDirErrorPanic(e);
+        defer allocator.free(save_dir_path);
+        std.process.changeCurDir(save_dir_path) catch |e| switch(e) {
+            error.FileNotFound => {
+                // TODO handle these errors:
+                std.fs.makeDirAbsolute(save_dir_path) catch unreachable;
+                var dir = std.fs.openDirAbsolute(save_dir_path, .{}) catch unreachable;
+                defer dir.close();
+                initSaveFolder(dir);
+                std.process.changeCurDir(save_dir_path) catch unreachable;
+            },
+            else => changeDirErrorPanic(e)
+        };
+        std.log.debug("cwd changed to: {s}", .{save_dir_path});
     } else @compileError("Either -Dsave_folder=\"\" (for debugging) or -Dgame_dir_name=\"\" (for release) must be specified when building");
+}
+
+/// creates all the files neccesary for the save folder if one doesn't already exist
+pub fn initSaveFolder(dir: std.fs.Dir) void {
+    // TODO: handle these errors:
+    dir.makeDir("all_available_mods") catch |e| switch(e) {
+        error.PathAlreadyExists => {},
+        else => |subset_e| std.debug.panic("got error creating all_available_mods dir: {}", .{subset_e})
+    };
+    dir.makeDir("mods") catch |e| switch(e) {
+        error.PathAlreadyExists => {},
+        else => |subset_e| std.debug.panic("got error creating mods dir: {}", .{subset_e})
+    };
 }
 
 inline fn changeDirErrorPanic(err: std.posix.ChangeCurDirError) noreturn {
