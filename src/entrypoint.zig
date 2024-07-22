@@ -4,6 +4,7 @@ const aio = @import("aio");
 const coro = @import("coro");
 const JobRunner = @import("JobRunner.zig");
 const tracer = @import("tracer");
+const zware = @import("zware");
 // TODO: remove this functionality from entrypoint, place it in here
 const wasm_spawner = @import("game_mods/wasm_loader.zig");
 
@@ -23,6 +24,7 @@ pub const tracer_impl = tracer.none;
 // TODO: figure out what to do with assets directory with !config.dev
 // TODO: instead of failing, create an init fail function
 // TODO: switch based on if we want a clean exit or just let the OS handle it
+// TODO: move wasm module creating code to a mach module??
 pub fn main() !void {
     // TODO: release should use c allocator
     var GPA = std.heap.GeneralPurposeAllocator(.{}){};
@@ -37,6 +39,7 @@ pub fn main() !void {
     try jobs.init(ally);
     defer jobs.deinit(ally);
 
+    var wasm_mod_bytes: [][]u8 = undefined;
     // TODO: move mods_getter.zig logic here so we don't keep reopening stuff
     {
         var all_mods_dir = try std.fs.cwd().openDir("all_available_mods", .{ .iterate = true });
@@ -49,7 +52,8 @@ pub fn main() !void {
             }
             dag.deinit(ally);
         }
-
+        wasm_mod_bytes = try ally.alloc([]u8, dataslice.len);
+        errdefer ally.free(wasm_mod_bytes);
         const mod_dirs = try scratch.alloc(std.fs.Dir, dataslice.len);
         defer {} // TODO
         {
@@ -69,13 +73,20 @@ pub fn main() !void {
         const resets = try scratch.alloc(coro.ResetEvent, dataslice.len);
         defer scratch.free(resets);
         @memset(resets, .{});
+
         {
             errdefer jobs.scheduler.run(.cancel) catch unreachable;
-            for (mod_dirs, get_bytes_tasks, 0..) |dir, *task, i| task.* = try jobs.scheduler.spawn(wasm_spawner.spawnWasmMods, .{ ally, dir, dag, @as(u16, @intCast(i)), resets, &jobs.pool }, .{});
+            for (mod_dirs, get_bytes_tasks, 0..) |dir, *task, i| task.* = try jobs.scheduler.spawn(wasm_spawner.spawnWasmMods, .{ ally, dir, @as(u16, @intCast(i)), wasm_mod_bytes }, .{});
         }
-
         try jobs.scheduler.run(.wait);
-        // TODO: error handle for each
+        // TODO: error handle for each potential failed task, or just quit the application
+    }
+    defer ally.free(wasm_mod_bytes);
+    var store = zware.Store.init(ally);
+    defer store.deinit();
+
+    for (wasm_mod_bytes) |bytes| {
+        _ = try wasm_spawner.createModule(ally, bytes, &store);
     }
     try mach.core.initModule();
     while (mach.core.tick() catch unreachable) {}

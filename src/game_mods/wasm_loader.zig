@@ -1,24 +1,26 @@
 const std = @import("std");
 const aio = @import("aio");
 const coro = @import("coro");
+const zware = @import("zware");
 
 const Data = @import("mod_folder_parser.zig").Data;
 const ModDAG = @import("dep_graph.zig").ModDAG;
 
-pub fn spawnWasmMods(ally: std.mem.Allocator, mod_dir: std.fs.Dir, dag: ModDAG, i: u16, resets: []coro.ResetEvent, pool: *coro.ThreadPool) !void {
-    const bytes = try getInitWasmBytes(ally, mod_dir);
-    defer ally.free(bytes);
-    if (dag.getModDeps(i)) |deps| {
-        for (deps) |dep| try resets[dep].wait();
-    }
-    _ = try pool.yieldForCompletition(createModule, .{bytes}, .{});
-    resets[i].set();
+pub fn spawnWasmMods(ally: std.mem.Allocator, mod_dir: std.fs.Dir, i: u16, out_bytes: [][]u8) !void {
+    out_bytes[i] = try getInitWasmBytes(ally, mod_dir);
+    // TODO: determine lifetime requirements of bytes
+    // TODO: move the rest of extracting modmeta.json, etc into here
 }
 
 // TODO: implement this bruh
-pub fn createModule(bytes: []const u8) !void {
-    _ = bytes;
-    return;
+pub fn createModule(ally: std.mem.Allocator, bytes: []const u8, store: *zware.Store) !struct { zware.Instance, zware.Module } {
+    var module = zware.Module.init(ally, bytes);
+    //defer module.deinit();
+    try module.decode();
+    var instance = zware.Instance.init(ally, store, module);
+    try instance.instantiate();
+    //defer instance.deinit();
+    return .{ instance, module };
 }
 
 pub fn getInitWasmBytes(ally: std.mem.Allocator, mod_dir: std.fs.Dir) ![]u8 {
