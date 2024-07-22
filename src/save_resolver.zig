@@ -16,7 +16,7 @@ pub fn changeCWDToSave(allocator: std.mem.Allocator) void {
             error.AppDataDirUnavailable => std.debug.panic("Appdata directory not found for some reason", .{}),
         };
         defer allocator.free(save_dir_path);
-        std.process.changeCurDir(save_dir_path) catch |e| switch(e) {
+        std.process.changeCurDir(save_dir_path) catch |e| switch (e) {
             error.FileNotFound => {
                 // TODO handle these errors:
                 std.fs.makeDirAbsolute(save_dir_path) catch unreachable;
@@ -25,7 +25,7 @@ pub fn changeCWDToSave(allocator: std.mem.Allocator) void {
                 initSaveFolder(dir);
                 std.process.changeCurDir(save_dir_path) catch unreachable;
             },
-            else => changeDirErrorPanic(e)
+            else => changeDirErrorPanic(e),
         };
         std.log.debug("cwd changed to: {s}", .{save_dir_path});
     } else @compileError("Either -Dsave_folder=\"\" (for debugging) or -Dgame_dir_name=\"\" (for release) must be specified when building");
@@ -34,13 +34,13 @@ pub fn changeCWDToSave(allocator: std.mem.Allocator) void {
 /// creates all the files neccesary for the save folder if one doesn't already exist
 pub fn initSaveFolder(dir: std.fs.Dir) void {
     // TODO: handle these errors:
-    dir.makeDir("all_available_mods") catch |e| switch(e) {
+    dir.makeDir("all_available_mods") catch |e| switch (e) {
         error.PathAlreadyExists => {},
-        else => |subset_e| std.debug.panic("got error creating all_available_mods dir: {}", .{subset_e})
+        else => |subset_e| std.debug.panic("got error creating all_available_mods dir: {}", .{subset_e}),
     };
-    dir.makeDir("mods") catch |e| switch(e) {
+    dir.makeDir("mods") catch |e| switch (e) {
         error.PathAlreadyExists => {},
-        else => |subset_e| std.debug.panic("got error creating mods dir: {}", .{subset_e})
+        else => |subset_e| std.debug.panic("got error creating mods dir: {}", .{subset_e}),
     };
 }
 

@@ -50,11 +50,11 @@ pub fn build(b: *std.Build) !void {
     exe.root_module.addImport("aio", aio_dep.module("aio"));
     exe.root_module.addImport("coro", aio_dep.module("coro"));
 
-    const tracer_dep = b.dependency("zig_tracer", .{.target = target, .optimize = optimize});
+    const tracer_dep = b.dependency("zig_tracer", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("tracer", tracer_dep.module("tracer"));
     mach_dep.module("mach").addImport("tracer", tracer_dep.module("tracer"));
     var iter = mach_dep.module("mach").iterateDependencies(null, false);
-    while(iter.next()) |val| val.module.addImport("tracer", tracer_dep.module("tracer"));
+    while (iter.next()) |val| val.module.addImport("tracer", tracer_dep.module("tracer"));
 
     if (!dev) {
         exe.subsystem = .Windows;
