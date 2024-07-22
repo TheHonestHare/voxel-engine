@@ -1,5 +1,7 @@
 const std = @import("std");
 const mach = @import("mach");
+const aio = @import("aio");
+const coro = @import("coro");
 const config = @import("config");
 const events = @import("./event.zig");
 const render = @import("./render.zig");
@@ -21,6 +23,9 @@ pub const std_options: std.Options = .{ .log_scope_levels = &[_]std.log.ScopeLev
     .{ .scope = .mach, .level = .debug },
 } };
 
+pub const aio_options: aio.Options = .{};
+pub const coro_options: coro.Options = .{};
+
 title_timer: if (config.dev) mach.Timer else void,
 timer: mach.Timer,
 camera_controller: CameraController = undefined,
@@ -36,10 +41,10 @@ pub fn init(game: *Mod, core: *mach.Core.Mod) !void {
 pub fn after_init(game: *Mod, core: *mach.Core.Mod) !void {
     game.init(.{
         .timer = try mach.Timer.start(),
-        .title_timer = if (config.dev) (try mach.Timer.start()) else .{},
+        .title_timer = if (config.dev) (try mach.Timer.start()) else {},
     });
 
-    // TODO: add back normal title when not in dev
+    try mach.core.printTitle(initial_title, .{});
     try render.init();
     CameraController.init();
     game.state().camera_controller = .{};
@@ -62,7 +67,7 @@ pub fn deinit(game: *Mod, core: *mach.Core.Mod) void {
 fn display_stats_on_title(game: *Mod, core: *mach.Core.Mod) !void {
     if (game.state().title_timer.read() >= 1.0) {
         game.state().title_timer.reset();
-        try mach.Core.printTitle(core, core.state().main_window, initial_title ++ " [FPS {d} Input {d}hz]", .{
+        try mach.core.printTitle(initial_title ++ " [FPS {d} Input {d}hz]", .{
             mach.core.frameRate(),
             mach.core.inputRate(),
         });

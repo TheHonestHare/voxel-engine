@@ -80,8 +80,7 @@ pub fn init(self: *@This()) void {
         ),
     } }));
 
-    const bindgroup = core.device.createBindGroup(&gpu.BindGroup.Descriptor.init(.{ .layout = bindgroup_layout, .entries = &.{ 
-    gpu.BindGroup.Entry.buffer(
+    const bindgroup = core.device.createBindGroup(&gpu.BindGroup.Descriptor.init(.{ .layout = bindgroup_layout, .entries = &.{ gpu.BindGroup.Entry.buffer(
         groups.group_2.header.binding,
         header_buff,
         0,

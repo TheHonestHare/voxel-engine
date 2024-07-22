@@ -4,8 +4,21 @@
 
     .dependencies = .{
         .mach = .{
-            .url = "https://pkg.machengine.org/mach/b72f0e11b6d292c2b60789359a61f7ee6d7dc371.tar.gz",
-            .hash = "122015e1dac4afaf275f7f2adde3814e6a27f5799cbef96bb487ee305f7e33f4dca3",
+            .url = "https://github.com/hexops/mach/archive/refs/heads/0.4.tar.gz",
+            .hash = "1220d164f5570cbeb683be58f61f345d50de15b9b8e7e4db04c83f4207d78e585332",
+        },
+        .zware = .{
+            .url = "https://github.com/malcolmstill/zware/archive/refs/heads/master.tar.gz",
+            .hash = "1220111dbf520f29c3fd7f96853fa20ce43e46c2c73e021bcbb3ea5fb931c84034be",
+        },
+        // first added on b5a4073
+        .zig_aio = .{
+            .url = "git+https://github.com/Cloudef/zig-aio.git#2ece8f9af4de70693840b1b36b7887bd30c655a6",
+            .hash = "12208a0a0bf8b899f0d95428a3231d16029620cb74a27baf11545f646a9d94e1ee48",
+        },
+        .zig_tracer = .{
+            .url = "https://github.com/paperdave/zig-tracer/archive/refs/heads/master.tar.gz",
+            .hash = "12202d60766a46ceb4074ce5651a58a11f2f6b32927476a55c6889805073e8e3d261",
         },
     },
 

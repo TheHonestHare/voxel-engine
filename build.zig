@@ -8,16 +8,25 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const dev = !(b.option(bool, "no_dev", "disables development features") orelse false);
     const options = b.addOptions();
+
+    const dev = !(b.option(bool, "no_dev", "disables development features useful for mod devs") orelse false);
     options.addOption(bool, "dev", dev);
 
-    const assets_dir = b.option([]const u8, "assets_dir", "path to assets folder") orelse "\\..\\..\\src\\assets";
-    options.addOption([]const u8, "assets_dir", assets_dir);
+    const engine_dev = (b.option(bool, "engine_dev", "enabled debugging features that literally only I (the writer of the engine) care about") orelse false);
+    options.addOption(bool, "engine_dev", engine_dev);
+    // TODO: option for removing hash validation
+    const src_folder = b.option([]const u8, "src_folder", "path to src folder relative to the executable location. Used for shader hot reloading");
+    options.addOption(?[]const u8, "src_folder", src_folder);
+
+    const save_folder = b.option([]const u8, "save_folder", "path to a custom development save folder from executable location. Must follow the same save structure as usual");
+    options.addOption(?[]const u8, "save_folder", save_folder);
+
+    const game_dir = b.option([]const u8, "game_dir_name", "The directory name to use for save folder under std.fs.getAppDataDir");
+    options.addOption(?[]const u8, "game_dir_name", game_dir);
 
     const validation = !(b.option(bool, "no_validation", "disables validation checking") orelse false);
     options.addOption(bool, "validate", validation);
-
 
     const exe = b.addExecutable(.{
         .name = "voxel_renderer",
@@ -30,15 +39,28 @@ pub fn build(b: *std.Build) !void {
 
     const mach_dep = b.dependency("mach", .{ .target = target, .optimize = optimize, .core = true });
     @import("mach").link(mach_dep.builder, exe);
-
     exe.root_module.addImport("mach", mach_dep.module("mach"));
+
+    if (!target.result.isWasm()) {
+        const zware_dep = b.dependency("zware", .{ .target = target, .optimize = optimize });
+        exe.root_module.addImport("zware", zware_dep.module("zware"));
+    } else return error.WasmNotSupportedYet;
+
+    const aio_dep = b.dependency("zig_aio", .{ .target = target, .optimize = optimize });
+    exe.root_module.addImport("aio", aio_dep.module("aio"));
+    exe.root_module.addImport("coro", aio_dep.module("coro"));
+
+    const tracer_dep = b.dependency("zig_tracer", .{ .target = target, .optimize = optimize });
+    exe.root_module.addImport("tracer", tracer_dep.module("tracer"));
+    mach_dep.module("mach").addImport("tracer", tracer_dep.module("tracer"));
+    var iter = mach_dep.module("mach").iterateDependencies(null, false);
+    while (iter.next()) |val| val.module.addImport("tracer", tracer_dep.module("tracer"));
 
     if (!dev) {
         exe.subsystem = .Windows;
     }
     exe.root_module.addOptions("config", options);
     b.installArtifact(exe);
-
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&b.addRunArtifact(exe).step);
