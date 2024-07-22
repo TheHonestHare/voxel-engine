@@ -13,8 +13,8 @@
         },
         // first added on b5a4073
         .zig_aio = .{
-            .url = "https://github.com/Cloudef/zig-aio/archive/refs/heads/master.tar.gz",
-            .hash = "1220a55aedabdd10578d0c514719ea39ae1bc6d7ed990f508dc100db7f0ccf391437",
+            .url = "git+https://github.com/Cloudef/zig-aio.git#2ece8f9af4de70693840b1b36b7887bd30c655a6",
+            .hash = "12208a0a0bf8b899f0d95428a3231d16029620cb74a27baf11545f646a9d94e1ee48",
         },
         .zig_tracer = .{
             .url = "https://github.com/paperdave/zig-tracer/archive/refs/heads/master.tar.gz",

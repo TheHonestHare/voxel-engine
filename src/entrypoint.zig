@@ -33,62 +33,63 @@ pub fn main() !void {
     defer _ = GPA.deinit();
     const ally = GPA.allocator();
     const scratch = arena.allocator();
+    _ = scratch; // remove when adding back wasm-mods behaviour
     mach.core.allocator = ally;
     save.changeCWDToSave(ally); // args specified in build options
 
-    var jobs: JobRunner = undefined;
-    try jobs.init(ally);
-    defer jobs.deinit(ally);
+    // var jobs: JobRunner = undefined;
+    // try jobs.init(ally);
+    // defer jobs.deinit(ally);
 
-    var wasm_mod_bytes: [][]u8 = undefined;
-    // TODO: move mods_getter.zig logic here so we don't keep reopening stuff
-    {
-        var all_mods_dir = try std.fs.cwd().openDir("all_available_mods", .{ .iterate = true });
-        defer all_mods_dir.close();
-        const dataslice, const metaslice, const dag = try @import("game_mods/mods_getter.zig").parseAllModsDir(ally, scratch, all_mods_dir);
-        defer {
-            for (dataslice, metaslice) |data, meta| {
-                data.deinit(ally);
-                meta.deinit(ally);
-            }
-            dag.deinit(ally);
-        }
-        wasm_mod_bytes = try ally.alloc([]u8, dataslice.len);
-        errdefer ally.free(wasm_mod_bytes);
-        const mod_dirs = try scratch.alloc(std.fs.Dir, dataslice.len);
-        defer {} // TODO
-        {
-            var i: u16 = 0;
-            errdefer for (mod_dirs[0..i]) |*dir| dir.close();
-            for (dataslice, mod_dirs) |data, *dir| {
-                dir.* = try all_mods_dir.openDir(data.dirname, .{});
-                std.debug.assert(i < dataslice.len);
-                i += 1;
-            }
-        }
-        defer for (mod_dirs) |*dir| dir.close();
+    // var wasm_mod_bytes: [][]u8 = undefined;
+    // // TODO: move mods_getter.zig logic here so we don't keep reopening stuff
+    // {
+    //     var all_mods_dir = try std.fs.cwd().openDir("all_available_mods", .{ .iterate = true });
+    //     defer all_mods_dir.close();
+    //     const dataslice, const metaslice, const dag = try @import("game_mods/mods_getter.zig").parseAllModsDir(ally, scratch, all_mods_dir);
+    //     defer {
+    //         for (dataslice, metaslice) |data, meta| {
+    //             data.deinit(ally);
+    //             meta.deinit(ally);
+    //         }
+    //         dag.deinit(ally);
+    //     }
+    //     wasm_mod_bytes = try ally.alloc([]u8, dataslice.len);
+    //     errdefer ally.free(wasm_mod_bytes);
+    //     const mod_dirs = try scratch.alloc(std.fs.Dir, dataslice.len);
+    //     defer {} // TODO
+    //     {
+    //         var i: u16 = 0;
+    //         errdefer for (mod_dirs[0..i]) |*dir| dir.close();
+    //         for (dataslice, mod_dirs) |data, *dir| {
+    //             dir.* = try all_mods_dir.openDir(data.dirname, .{});
+    //             std.debug.assert(i < dataslice.len);
+    //             i += 1;
+    //         }
+    //     }
+    //     defer for (mod_dirs) |*dir| dir.close();
 
-        const get_bytes_tasks = try scratch.alloc(coro.Task.Generic2(wasm_spawner.spawnWasmMods), dataslice.len);
-        defer {} // TODO
+    //     const get_bytes_tasks = try scratch.alloc(coro.Task.Generic2(wasm_spawner.spawnWasmMods), dataslice.len);
+    //     defer {} // TODO
 
-        const resets = try scratch.alloc(coro.ResetEvent, dataslice.len);
-        defer scratch.free(resets);
-        @memset(resets, .{});
+    //     const resets = try scratch.alloc(coro.ResetEvent, dataslice.len);
+    //     defer scratch.free(resets);
+    //     @memset(resets, .{});
 
-        {
-            errdefer jobs.scheduler.run(.cancel) catch unreachable;
-            for (mod_dirs, get_bytes_tasks, 0..) |dir, *task, i| task.* = try jobs.scheduler.spawn(wasm_spawner.spawnWasmMods, .{ ally, dir, @as(u16, @intCast(i)), wasm_mod_bytes }, .{});
-        }
-        try jobs.scheduler.run(.wait);
-        // TODO: error handle for each potential failed task, or just quit the application
-    }
-    defer ally.free(wasm_mod_bytes);
-    var store = zware.Store.init(ally);
-    defer store.deinit();
+    //     {
+    //         errdefer jobs.scheduler.run(.cancel) catch unreachable;
+    //         for (mod_dirs, get_bytes_tasks, 0..) |dir, *task, i| task.* = try jobs.scheduler.spawn(wasm_spawner.spawnWasmMods, .{ ally, dir, @as(u16, @intCast(i)), wasm_mod_bytes }, .{});
+    //     }
+    //     try jobs.scheduler.run(.wait);
+    //     // TODO: error handle for each potential failed task, or just quit the application
+    // }
+    // defer ally.free(wasm_mod_bytes);
+    // var store = zware.Store.init(ally);
+    // defer store.deinit();
 
-    for (wasm_mod_bytes) |bytes| {
-        _ = try wasm_spawner.createModule(ally, bytes, &store);
-    }
+    // for (wasm_mod_bytes) |bytes| {
+    //     _ = try wasm_spawner.createModule(ally, bytes, &store);
+    // }
     try mach.core.initModule();
     while (mach.core.tick() catch unreachable) {}
 }
