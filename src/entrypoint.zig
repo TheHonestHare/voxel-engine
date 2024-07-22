@@ -25,6 +25,7 @@ pub const tracer_impl = tracer.none;
 // TODO: instead of failing, create an init fail function
 // TODO: switch based on if we want a clean exit or just let the OS handle it
 // TODO: move wasm module creating code to a mach module??
+// TODO: turn this into a "library" of sorts aka let the app handle the entrypoint
 pub fn main() !void {
     // TODO: release should use c allocator
     var GPA = std.heap.GeneralPurposeAllocator(.{}){};
