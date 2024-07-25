@@ -28,6 +28,9 @@ pub fn build(b: *std.Build) !void {
     const validation = !(b.option(bool, "no_validation", "disables validation checking") orelse false);
     options.addOption(bool, "validate", validation);
 
+    const clean_exit = !(b.option(bool, "no_clean_exit", "disables stuff like closing files, deallocating upon program exit") orelse false);
+    options.addOption(bool, "clean_exit", clean_exit);
+
     const exe = b.addExecutable(.{
         .name = "voxel_renderer",
         .root_source_file = b.path("./src/entrypoint.zig"),

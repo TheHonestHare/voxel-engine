@@ -5,6 +5,7 @@ const coro = @import("coro");
 const JobRunner = @import("JobRunner.zig");
 const tracer = @import("tracer");
 const zware = @import("zware");
+const allys = @import("allocators.zig");
 // TODO: remove this functionality from entrypoint, place it in here
 const wasm_spawner = @import("game_mods/wasm_loader.zig");
 
@@ -23,19 +24,18 @@ pub const tracer_impl = tracer.none;
 
 // TODO: figure out what to do with assets directory with !config.dev
 // TODO: instead of failing, create an init fail function
-// TODO: switch based on if we want a clean exit or just let the OS handle it
+// TODO: in all files: get rid of using mach.core.allocator, use one from allys
 // TODO: move wasm module creating code to a mach module??
 // TODO: turn this into a "library" of sorts aka let the app handle the entrypoint
 pub fn main() !void {
-    // TODO: release should use c allocator
-    var GPA = std.heap.GeneralPurposeAllocator(.{}){};
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer _ = GPA.deinit();
-    const ally = GPA.allocator();
-    const scratch = arena.allocator();
-    _ = scratch; // remove when adding back wasm-mods behaviour
-    mach.core.allocator = ally;
-    save.changeCWDToSave(ally); // args specified in build options
+    allys.init();
+    defer allys.deinit();
+
+    const ally = allys.LongAllocator; // TODO: remove this alias
+    _ = ally; // autofix
+    const scratch = allys.TickAllocator; // TODO: remove this alias
+    mach.core.allocator = allys.LongAllocator;
+    save.changeCWDToSave(scratch); // args specified in build options
 
     // var jobs: JobRunner = undefined;
     // try jobs.init(ally);
@@ -90,6 +90,7 @@ pub fn main() !void {
     // for (wasm_mod_bytes) |bytes| {
     //     _ = try wasm_spawner.createModule(ally, bytes, &store);
     // }
+    _ = allys.TickArena.reset(.retain_capacity);
     try mach.core.initModule();
     while (mach.core.tick() catch unreachable) {}
 }
